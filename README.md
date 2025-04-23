@@ -11,6 +11,10 @@
 
 ---
 
+[Prácticas SIP](practic_sip/practicsip_01.md)
+
+---
+
 ## Arquitectura del protocolo SIP
 
 En la arquitectura del protocolo **SIP** los elementos situados en los extremos de la comunicación que intercambian métodos y respustas en una sesión se denominan _agentes de usuarios (UA)_ y puede adoptar tanto el papel de clientes (UAC) como el papel de servidores (UAS) dependiendo de si hacen peticiones o reciben peticiones.
