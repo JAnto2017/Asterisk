@@ -8,6 +8,8 @@
   - [Ficheros de configuración en Asterisk Exchange](#ficheros-de-configuración-en-asterisk-exchange)
   - [Configuración del fichero pjsip.conf](#configuración-del-fichero-pjsipconf)
   - [Configuración del dialplan](#configuración-del-dialplan)
+  - [La aplicación Dial()](#la-aplicación-dial)
+    - [Options en la aplicación Dial()](#options-en-la-aplicación-dial)
 
 ---
 
@@ -154,3 +156,21 @@ Asterisk cuenta con más de 200 aplicaciones distintas, donde la más importante
 - La aplicación **Hangup()** se ejecuta en segundo lugar porque tiene prioridad 2 y le indica a Asterisk la finalización de las aplicaciones para el patrón de llamadas.
 
 Cuando se modifica el dialplan es necesario recargarlo desde el CLI de Asterisk mediante el comando **dialplan reload**.
+
+---
+
+## La aplicación Dial()
+
+Es la más importante de Asterisk y su función es realizar llamadas. La aplicación **Dial()** tiene los parámetros: `Dial(Tecnología/Recurso, timeout, [options, [URL]])`.
+
+- **Tecnología/Recurso**: indica el driver de la llamada, en este caso el driver _pjsip_.
+- **URI**: indica la URI de destino de la llamada. En este caso la URI es el número marcado. 
+- El parámetro **${EXTEN}** indica el número marcado.
+- El parámetro **timeout** indica el tiempo de espera de la llamada. En este caso el tiempo es de 10 segundos.
+- El parámetro **options** indica el comportamiento de la llamada. Con funciones como: reproducir audio, grabar audio, descolgar la llamada, limitar la duración de una llamada, activar la musica en espera, etc.
+
+La aplicación **Dial()** se puede utilizar en su forma básica, sin ningún parámetro opcional. El parámetro **timeout** establece el número de segundos durantel cual se envía la llamada al destino, finalizando de forma automática si no es descolgada en el tiempo indicado.
+
+![alt text](image.png "Ejemplo de aplicación Dial()")
+
+### Options en la aplicación Dial()
