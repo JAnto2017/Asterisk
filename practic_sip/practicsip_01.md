@@ -232,6 +232,9 @@ Crear una configuración básica para Asterisk usando SIP en la que tres termina
 
 ```sip.conf
 [general]
+;language=es
+udpbindaddr=0.0.0.0
+
 context=internal
 allowguest=no
 allowoverlap=no
@@ -246,7 +249,7 @@ host=dynamic
 secret=clave101
 context=internal
 disallow=all
-allow=ulaw
+allow=ulaw,alaw,gsm
 callerid="Terminal 101" <101>
 
 ; === Terminal 102 ===
@@ -256,7 +259,7 @@ host=dynamic
 secret=clave102
 context=internal
 disallow=all
-allow=ulaw
+allow=ulaw,alaw,gsm
 callerid="Terminal 102" <102>
 
 ; === Terminal 103 ===
@@ -266,7 +269,7 @@ host=dynamic
 secret=clave103
 context=internal
 disallow=all
-allow=ulaw
+allow=ulaw,alaw,gsm
 callerid="Terminal 103" <103>
 
 ```
@@ -320,6 +323,11 @@ En cada terminal se debe configurar de la siguiente forma:
 
 ```voicemail.conf
 [general]
+language=es
+
+[globals]
+exten => s,n,Set(LANGUAGE()=es)
+
 format=wav49|gsm|wav
 serveremail=asterisk@example.com
 attach=yes
@@ -340,6 +348,12 @@ emailbody=Has recibido un nuevo mensaje de voz.
 #### Configuración del Archivo extensions.conf
 
 ```extensions.conf
+[general]
+language=es
+
+[globals]
+exten => s,n,Set(LANGUAGE()=es)
+
 [internal]
 ; === Extensión 101 ===
 exten => 101,1,Dial(SIP/101,15)

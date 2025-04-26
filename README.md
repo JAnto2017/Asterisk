@@ -11,8 +11,8 @@
 
 ---
 
-[Prácticas SIP](practic_sip/practicsip_01.md)
-[Prácticas PJSIP](practic_pjsip/practpjsip.md)
+- [Prácticas SIP](practic_sip/practicsip_01.md)
+- [Prácticas PJSIP](practic_pjsip/practpjsip.md)
 
 ---
 

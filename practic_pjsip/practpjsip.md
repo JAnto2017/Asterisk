@@ -5,28 +5,30 @@
 ### Archivos clave para chan_pjsip
 
 1. `pjsip.conf` &rarr; donde se definen los _endpoints_, _aors_ y _auths_.
-2. `pjsip.conf` &rarr; el _dialplan_ para permitir llamadas entre las extensiones.
+2. `extensions.conf` &rarr; el _dialplan_ para permitir llamadas entre las extensiones.
 
 ### Configurar 4 Extensiones básicas
 
-Las extesniones creadas tienen los números: 101 a 104.
+Las extesniones creadas en el fichero `pjsip.conf` tienen los números: 101 a 104.
 
 ```asterisk
 [global]
-type=global
-user_agent=Asterisk-PJSIP
+;type=global
+;user_agent=Asterisk-PJSIP
 
 [transport-udp]
 type=transport
 protocol=udp
 bind=0.0.0.0:5060
+;bind=0.0.0.0
 
-; === EXTENSION 101 ===
+; === EXTENSION 101 ================================
 [101]
 type=endpoint
 transport=transport-udp
-context=internal
+context=llamadas-internas
 disallow=all
+allow=alaw
 allow=ulaw
 auth=auth101
 aors=101
@@ -35,18 +37,20 @@ aors=101
 type=auth
 auth_type=userpass
 username=101
-password=clave101
+password=123456789
 
 [101]
 type=aor
 max_contacts=1
+remove_existing=yes
 
-; === EXTENSION 102 ===
+; === EXTENSION 102 ================================
 [102]
 type=endpoint
 transport=transport-udp
-context=internal
+context=llamadas-internas
 disallow=all
+allow=alaw
 allow=ulaw
 auth=auth102
 aors=102
@@ -61,12 +65,13 @@ password=clave102
 type=aor
 max_contacts=1
 
-; === EXTENSION 103 ===
+; === EXTENSION 103 ================================
 [103]
 type=endpoint
 transport=transport-udp
-context=internal
+context=llamadas-internas
 disallow=all
+allow=alaw
 allow=ulaw
 auth=auth103
 aors=103
@@ -81,12 +86,13 @@ password=clave103
 type=aor
 max_contacts=1
 
-; === EXTENSION 104 ===
+; === EXTENSION 104 ================================
 [104]
 type=endpoint
 transport=transport-udp
-context=internal
+context=llamadas-internas
 disallow=all
+allow=alaw
 allow=ulaw
 auth=auth104
 aors=104
@@ -105,18 +111,25 @@ max_contacts=1
 
 ### Permitir llamadas entre las extensiones
 
+La configuración del dialplan se encuentra en el fichero `/et/asterisk/extensions.conf`. Este fichero debe tener la siguiente configuración para poder realizar llamadas entre las extensiones:
+
 ```asterisk
-[internal]
-exten => 101,1,Dial(PJSIP/101)
+[general]
+static=yes
+
+[globals]
+
+[llamadas-internas]
+exten => 101,1,Dial(PJSIP/${EXTEN})
  same => n,Hangup()
 
-exten => 102,1,Dial(PJSIP/102)
+exten => 102,1,Dial(PJSIP/${EXTEN})
  same => n,Hangup()
 
-exten => 103,1,Dial(PJSIP/103)
+exten => 103,1,Dial(PJSIP/${EXTEN})
  same => n,Hangup()
 
-exten => 104,1,Dial(PJSIP/104)
+exten => 104,1,Dial(PJSIP/${EXTEN})
  same => n,Hangup()
 ```
 
@@ -134,7 +147,9 @@ Puedes usar softphones como _Zoiper_, _MicroSIP_, _Linphone_ o _Teléfonos IP f�
 ### Verificación
 
 - `sudo asterisk -rvvv`.
-- En modo CLI> `sip show peers`.
+- En modo CLI> `core reload`.
+- En modo CLI> `pjsip reload`.
+- En modo CLI> `pjsip show ...` añadir modificador. Para ver los disponibles, pulsar la tecla TAB.
 - Realizar llamadas entre los terminales.
 
 - - -
