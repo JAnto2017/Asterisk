@@ -10,6 +10,8 @@
   - [Configuración del dialplan](#configuración-del-dialplan)
   - [La aplicación Dial()](#la-aplicación-dial)
     - [Options en la aplicación Dial()](#options-en-la-aplicación-dial)
+      - [Conversión de audio MP3-WAV](#conversión-de-audio-mp3-wav)
+      - [Límite de tiempo de llamada](#límite-de-tiempo-de-llamada)
 
 ---
 
@@ -164,7 +166,7 @@ Cuando se modifica el dialplan es necesario recargarlo desde el CLI de Asterisk 
 Es la más importante de Asterisk y su función es realizar llamadas. La aplicación **Dial()** tiene los parámetros: `Dial(Tecnología/Recurso, timeout, [options, [URL]])`.
 
 - **Tecnología/Recurso**: indica el driver de la llamada, en este caso el driver _pjsip_.
-- **URI**: indica la URI de destino de la llamada. En este caso la URI es el número marcado. 
+- **URI**: indica la URI de destino de la llamada. En este caso la URI es el número marcado.
 - El parámetro **${EXTEN}** indica el número marcado.
 - El parámetro **timeout** indica el tiempo de espera de la llamada. En este caso el tiempo es de 10 segundos.
 - El parámetro **options** indica el comportamiento de la llamada. Con funciones como: reproducir audio, grabar audio, descolgar la llamada, limitar la duración de una llamada, activar la musica en espera, etc.
@@ -173,4 +175,64 @@ La aplicación **Dial()** se puede utilizar en su forma básica, sin ningún par
 
 ![alt text](image.png "Ejemplo de aplicación Dial()")
 
+```asterisk
+[operadora]
+
+exten => 102,1,Dial(pjsip/${EXTEN},10)
+ same => n,Hangup()
+
+[trabajadores]
+
+exten => 101,1,Dial(pjsip/${EXTEN},10)
+ same => n,Hangup()
+```
+
 ### Options en la aplicación Dial()
+
+La aplicación **Dial()** cuenta con un amplio conjunto de opciones para el comportamiento de la llamada.
+
+- **m**: activa la música en espera a la parte llammante hasta que la parte llamada descuelga la llamada.
+- **L(x[:y][:z])**: limita la duración de la llamada, enviando unos mensajes de aviso cuando falta un cierto tiempo para la finalización. El parámetro **x** indica el tiempo en segundos. El parámetro **y** indica el tiempo en minutos. El parámetro **z** indica el tiempo en horas.
+- **A(x)**: reproduce el mensaje de audio especificado por **x** a la parte llamada.
+- **S(n)**: cuelga la llamada **n** segundos después de haber sido descolgada.
+- **T**: permite transferir una llamada al usuario que la ha iniciado.
+- **t**: permite transferir una llamada al usuario que la ha recibido.
+
+Mediante el comando `core show application dial` podemos consultar las opciones disponibles.
+
+Ejemplo de extensión haciendo uso de la música en espera, configuración vállida para _pjsip.conf_:
+
+```asterisk
+[internas]
+
+exten => 102,1,Dial(pjsip/${EXTEN},10,m)
+ same => n,Hangup()
+```
+
+El archivo de audio que se reproduce es uno de los cinco instalados por defecto durante la compilación de Asterisk. Estos ficheros están en formato _wav_ en la ruta: `/var/lib/asterisk/moh`.
+
+Para consultar la lista completa de formatos de audio soportados: `core show file formats`.
+
+Asterisk reproduce el audio por orden alfabético inverso. Para la reproducción aleatorio se elimina la línea `sort=random` incluida en el archivo `musiconhold.conf` en la ruta `/etc/asterisk/musiconhold.conf`. Una vez modificado el fichero, se debe reiniciar ejecutando el comando `moh reload`.
+
+> [!tip]
+> Los archivos de audio se recomiendan en formato wav.
+
+#### Conversión de audio MP3-WAV
+
+**SoX (Sound eXchange)** permite convertir ficheros de audio **mp3** a formato **wav**.
+
+- Instalar la aplicación **SoX**: `sudo apt-get install sox libsox-fmt-all`.
+- Copiar los archivos de audio _mp3_ al directorio: `/var/lib/asterisk/moh`.
+- Ejecutar desde el directorio `/var/lib/asterisk/moh` el comando `sox *.mp3 -c1 -r 8000 *.wav`.
+
+El parámetro **-c1** indica el número de canales de audio (mono). El parámetro **-r 8000** indica la frecuencia de muestreo en Hz.
+
+> [!NOTE]
+>
+> La música en espera en formato wav para los teléfonos debe estar en formato mono PCM 16 bits y 800 Hz.
+>
+> El códec G711 alaw utilizado también tiene 800 Hz de frecuencia de muestreo, con 8 bits y cuantificación no uniforme.
+
+#### Límite de tiempo de llamada
+
