@@ -12,6 +12,9 @@
     - [Options en la aplicación Dial()](#options-en-la-aplicación-dial)
       - [Conversión de audio MP3-WAV](#conversión-de-audio-mp3-wav)
       - [Límite de tiempo de llamada](#límite-de-tiempo-de-llamada)
+      - [Mensaje de audio al comienzo de la llamada](#mensaje-de-audio-al-comienzo-de-la-llamada)
+      - [Colgado de la llamada al cabo de n segundos](#colgado-de-la-llamada-al-cabo-de-n-segundos)
+      - [Transferencia de llamadas](#transferencia-de-llamadas)
 
 ---
 
@@ -294,3 +297,50 @@ exten => 9,5,Hangup()
 ```
 
 El directorio `/var/lib/asterisk/sounds/es` elegido para almacenar estos mensajes de audio. Es también el directorio para almacenar los mensajes de audio del sistema en español.
+
+#### Mensaje de audio al comienzo de la llamada
+
+Con la opción `A(x)` en la aplicación `Dial()`, se puede reproducir un mensaje de audio al comienzo de la llamada. Indicado por el parámetro _x_ cuando el usuario llamado descuelga la llamada. Ejemplo de mensaje de audio: "Le recordamos que por su seguridad esta llamada puede ser grabada".
+
+Fichero _extensions.conf_:
+
+```conf
+[operadora]
+
+exten => 102,1,Dial(PJSIP/102,20)
+exten => 102,2,Hangup()
+
+exten => 103,1,Dial(PJSIP/103,20)
+exten => 103,2,Hangup()
+
+exten => 104,1,Dial(PJSIP/104,20)
+exten => 104,2,Hangup()
+
+exten => 8,1,Dial(PJSIP/102&PJSIP/103&PJSIP/104,30)
+exten => 8,2,Hangup() 
+
+exten => 661,1,Record(/var/lib/asterisk/sounds/es/AvisoLimite:wav)
+exten => 661,2,Hangup()
+
+[trabajadores]
+
+exten => 9,1,Answer(1000)
+exten => 9,2,Dial(PJSIP/101,20,mA(/var/lib/asterisk/sounds/es/AvisoLimite))
+exten => 9,3,Hangup()
+;mA = mensaje de audio al descolgar la llamada
+```
+
+#### Colgado de la llamada al cabo de n segundos
+
+Con la opción `S(n)` en la aplicación `Dial()`, se puede colgar la llamada al cabo de un tiempo determinado. Indicado por el parámetro _n_ en segundos. Se usa habitualmente para reproducir un mensaje de audio al usuario llamado y colgar la llamada a continuación.
+
+```conf
+[trabajadores]
+
+exten => 9,1,Answer(1000)
+exten => 9,2,Dial(PJSIP/101,20,mS(/var/lib/asterisk/sounds/es/MensajeGrabLlamado)S(2))
+exten => 9,3,Hangup()
+;S(2) = colgar la llamada al cabo de 2 segundos
+```
+
+#### Transferencia de llamadas
