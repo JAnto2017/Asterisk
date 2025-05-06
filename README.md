@@ -12,6 +12,9 @@
     - [Options en la aplicación Dial()](#options-en-la-aplicación-dial)
       - [Conversión de audio MP3-WAV](#conversión-de-audio-mp3-wav)
       - [Límite de tiempo de llamada](#límite-de-tiempo-de-llamada)
+      - [Mensaje de audio al comienzo de la llamada](#mensaje-de-audio-al-comienzo-de-la-llamada)
+      - [Colgado de la llamada al cabo de n segundos](#colgado-de-la-llamada-al-cabo-de-n-segundos)
+      - [Transferencia de llamadas](#transferencia-de-llamadas)
 
 ---
 
@@ -236,3 +239,108 @@ El parámetro **-c1** indica el número de canales de audio (mono). El parámetr
 
 #### Límite de tiempo de llamada
 
+La opción `L(x[:y][:z])` en la aplicación **Dial()** finaliza una llamada al cabo de un tiempo determinado, enviando previamente avisos mediante diferentes mensajes de audio.
+
+- **x**: tiempo de duración de la llamada (ms). La llamada finaliza automáticamente al cumplirse este tiempo.
+- **y**: tiempo de envío del mensaje de preaviso (ms). Se envía un mensaje de preaviso cuando falta este tiempo para la finalización de la llamda.
+- **z**: tiempo de repetición del mensaje de preaviso (ms). El mensaje se repite cada vez que se cumple este tiempo.
+
+Ejemplo de código en el fichero _extensions.conf_:
+
+```conf
+[operadora]
+
+exten => 102,1,Dial(PJSIP/102,20)
+exten => 102,2,Hangup()
+
+exten => 103,1,Dial(PJSIP/103,20)
+exten => 103,2,Hangup()
+
+exten => 104,1,Dial(PJSIP/104,20)
+exten => 104,2,Hangup()
+
+exten => 8,1,Dial(PJSIP/102&PJSIP/103&PJSIP/104,30)
+exten => 8,2,Hangup()
+
+[trabajadores]
+
+exten => 9,1,Dial(PJSIP/101,20,mL(6000:15000:5000))
+exten => 9,3,Hangup()
+;6000 límite de tiempo de llamada (60 seg.)
+;15000 tiempo de preaviso (15 seg)
+;5000 tiempo de repetición de preaviso (5 seg.)
+```
+
+Asterisk utiliza para el preaviso de finalización de llamada y para la repetición del preaviso el mensaje denominado _vm-youhave_. Estos mensajes se pueden grabar mediante la aplicación **Record()** y se incluyen en el _dialplan_ asignando la aplicación **Set()** los nombres de los ficheros de audio para reproducir a las siguientes variables:
+
+- **LIMIT_WARNING_FILE= filename**: especifica el fichero de audio de preaviso de finalización de llamada y de repetición del preaviso.
+- **LIMIT_CONNECT_FILE= filename**: especifica el fichero de audio que se reproduce al comenzar la llamada.
+
+Ejemplo de grabación de los dos mensajes de audio se realiza desde la extensión situada en el contexto de operadora mediante los números 661 y 662. Al finalizar la grabación es necesario presionar la tecla `#` para que el mensaje quede guardado en el directorio indicado.
+
+Código del archivo _extensions.conf_ para el mensaje de audio personalizados en el límite de tiempo de llamada:
+
+```conf
+;con Record() se debe indicar el formato
+exten => 661,1,Record(/var/lib/asterisk/sounds/es/AvisoLimite:wav)
+exten => 661,2,Hangup()
+
+exten => 662,1,Record(/var/lib/asterisk/sounds/es/AvisoLimite:wav)
+exten => 662,2,Hangup()
+
+[trabajadores]
+exten => 9,1,Answer(1000)
+exten => 9,2,Set(LIMIT_CONNECT_FILE=/var/lib/asterisk/sounds/es/AvisoLimite)
+exten => 9,3,Set(LIMIT_WARNING_FILE=/var/lib/asterisk/sounds/es/Preaviso)
+exten => 9,4,Dial(PJSIP/101,20,mL(20000:10000:5000))
+exten => 9,5,Hangup()
+```
+
+El directorio `/var/lib/asterisk/sounds/es` elegido para almacenar estos mensajes de audio. Es también el directorio para almacenar los mensajes de audio del sistema en español.
+
+#### Mensaje de audio al comienzo de la llamada
+
+Con la opción `A(x)` en la aplicación `Dial()`, se puede reproducir un mensaje de audio al comienzo de la llamada. Indicado por el parámetro _x_ cuando el usuario llamado descuelga la llamada. Ejemplo de mensaje de audio: "Le recordamos que por su seguridad esta llamada puede ser grabada".
+
+Fichero _extensions.conf_:
+
+```conf
+[operadora]
+
+exten => 102,1,Dial(PJSIP/102,20)
+exten => 102,2,Hangup()
+
+exten => 103,1,Dial(PJSIP/103,20)
+exten => 103,2,Hangup()
+
+exten => 104,1,Dial(PJSIP/104,20)
+exten => 104,2,Hangup()
+
+exten => 8,1,Dial(PJSIP/102&PJSIP/103&PJSIP/104,30)
+exten => 8,2,Hangup() 
+
+exten => 661,1,Record(/var/lib/asterisk/sounds/es/AvisoLimite:wav)
+exten => 661,2,Hangup()
+
+[trabajadores]
+
+exten => 9,1,Answer(1000)
+exten => 9,2,Dial(PJSIP/101,20,mA(/var/lib/asterisk/sounds/es/AvisoLimite))
+exten => 9,3,Hangup()
+;mA = mensaje de audio al descolgar la llamada
+```
+
+#### Colgado de la llamada al cabo de n segundos
+
+Con la opción `S(n)` en la aplicación `Dial()`, se puede colgar la llamada al cabo de un tiempo determinado. Indicado por el parámetro _n_ en segundos. Se usa habitualmente para reproducir un mensaje de audio al usuario llamado y colgar la llamada a continuación.
+
+```conf
+[trabajadores]
+
+exten => 9,1,Answer(1000)
+exten => 9,2,Dial(PJSIP/101,20,mS(/var/lib/asterisk/sounds/es/MensajeGrabLlamado)S(2))
+exten => 9,3,Hangup()
+;S(2) = colgar la llamada al cabo de 2 segundos
+```
+
+#### Transferencia de llamadas
