@@ -15,6 +15,7 @@
       - [Mensaje de audio al comienzo de la llamada](#mensaje-de-audio-al-comienzo-de-la-llamada)
       - [Colgado de la llamada al cabo de n segundos](#colgado-de-la-llamada-al-cabo-de-n-segundos)
       - [Transferencia de llamadas](#transferencia-de-llamadas)
+  - [Patrones de marcado y escritura compacta del DIALPLAN()](#patrones-de-marcado-y-escritura-compacta-del-dialplan)
 
 ---
 
@@ -344,3 +345,61 @@ exten => 9,3,Hangup()
 ```
 
 #### Transferencia de llamadas
+
+Las transferencias de llamadas en Asterisk se configuran mediante dos _options_ de la aplicación **Dial()**.
+
+- **T:** el usuario que ha iniciado una llamada puede transferirla a otra expresión.
+- **t:** el usuario que ha recibido una llamada puede transferirla a otra extensión.
+
+La transferencias pueden ser de dos tipos diferentes:
+
+- _**Blind Transfer**_ (transferencia ciega)
+- _**Attended Transfer**_ (transferencia atendida)
+
+Los códigos que se deben marcar para realizar ambos tipos de transferencias se configuran en la sección **[featuremap]** del fichero _features.conf_ situado en el directorio `/etc/asterisk`.
+
+```conf
+[featuremap]
+;bliddxfer => #1 ---> código para la transferencia ciega. Por defecto es #
+;disconnect => *0
+;automon => *1
+;atxfer => *2 -----> código para la tranaferencia atendida.
+;parkcall => #72
+;automixmon => *3
+```
+
+Los cambios en el fichero _features.conf_ se recargan mediante el comando de consola _reload features_.
+
+Ejemplo donde las extensiones que realizan una llamada pueden transferirla y también pueden hacerlo las extensiones que las reciben.
+
+```conf
+[extensiones-empresa]
+
+exten => 101,1,Dial(PJSIP/101,20,tT)
+exten => 101,2,Hangup()
+
+exten => 102,1,Dial(PJSIP/102,20,tT)
+exten => 102,2,Hangup()
+
+exten => 103,1,Dial(PJSIP/103,20,tT)
+exten => 103,2,Hangup()
+
+exten => 104,1,Dial(PJSIP/104,20,tT)
+exten => 104,2,Hangup()
+```
+
+La transferencia de llamadas es una de las funciones más utilizadas en las centralitas. El funcionamiento de las transferencias atendidas se puede ajustar mediante unas variables que existen en la sección **[general]** del fichero **features.conf** entre ellas **atxfernoanswertimeout**, que determina el tiempo que espera Asterisk para que la transferencia sea atendida antes de devolver la llamada a la extensión que la inicia (por defecto quince segundos) **atxferloopdelay** que determina el tiempo de espera antes de volver a reintentar la transferencia (por defecto, diez segundos) o **atxfercallbackretries** que fija el número de veces que se intenta de nuevo la transferencia (por defecto, dos veces)
+
+> Asterisk necesita que el flujo de audio RTP de una llamada pase a través de él para detectar peticiones de transferencia y esto lo hace de forma automática cuando detecta en una aplicación Dial() cualquiera de las opciones de transferencia de llamadas (option tT). El parámetro direct_media=no en el fichero pjsip.conf también hace que el flujo RTP pase a través de Asterisk
+
+Las señales DTMF correspondientes a los números marcados por las extensiones cuando solicitan una transferencia de llamadas, pueden ser enviadas de tres formas distintas hacia Asterisk:
+
+1. **In band**: la señalización DTMF es codificada y enviada en forma de paquetes RTP, de la misma manera que la señal de audio. Este sistema funciona bien con los _códecs_ de forma de onda, como _alaw_ y _ulaw_, pero falla con los _códecs_ de tipo paramétrico e híbrido, ya que estos no trabajan correctamente con señales diferentes a la voz humana.
+2. **Info**: la señalización DTMF se envía en mensajes SIP de tipo INFO. Este sistema no garantiza la reproducción de estas señales en el receptor en tiempo real, lo cual es un problema importante, ya que este tipo de señalización analógica tiene requisitos de temporización muy estrictos.
+3. **RFC 2833**: se generan paquetes RTP específicos con la descripción de los diferentes tonos DTMF enviados; se envían junto con los paquetes RTP de audio. Este sistema necesita que ambos extremos sean compatibles con el estándar, pero garantiza la reproducción en tiempo real de estos tonos en el receptor, siendo éste, el sistema  elegido por defecto en Asterisk. Actualmente el estándar RFC 2833 ha sido sustituido por el RFC 4733, aunque son muchos los teléfonos SIP que siguen implementando el estándar RFC 2833.
+
+Cuando una extensión inicia una llamada, el número marcado se transmite de forma digital dentro de un mensaje SIP, pero cuando la llamada está ya iniciada, cualquier pulsación del teclado del teléfono debe transmitirse como señal DTMF porque en esos momentos ya solo hay flujo de audio en forma de paquetes RTP.
+
+---
+
+## Patrones de marcado y escritura compacta del DIALPLAN()
