@@ -15,7 +15,10 @@
       - [Mensaje de audio al comienzo de la llamada](#mensaje-de-audio-al-comienzo-de-la-llamada)
       - [Colgado de la llamada al cabo de n segundos](#colgado-de-la-llamada-al-cabo-de-n-segundos)
       - [Transferencia de llamadas](#transferencia-de-llamadas)
-  - [Patrones de marcado y escritura compacta del DIALPLAN()](#patrones-de-marcado-y-escritura-compacta-del-dialplan)
+  - [Patrones de Marcado y Escritura Compacta del DIALPLAN()](#patrones-de-marcado-y-escritura-compacta-del-dialplan)
+    - [Uso de la Variable ${EXTEN}](#uso-de-la-variable-exten)
+    - [Selección de Dígitos en la Variable ${EXTEN}](#selección-de-dígitos-en-la-variable-exten)
+    - [Aplicación SayNumber()](#aplicación-saynumber)
 
 ---
 
@@ -402,4 +405,57 @@ Cuando una extensión inicia una llamada, el número marcado se transmite de for
 
 ---
 
-## Patrones de marcado y escritura compacta del DIALPLAN()
+## Patrones de Marcado y Escritura Compacta del DIALPLAN()
+
+Los patrones de marcado permiten a Asterisk identificar números marcados dentro de un determinado rango de valores, simplificando en gran manera la escritura del _dialplan_.
+
+> [!TIP]
+>
+> El patrón de marcado siempre comienza en el símbolo de guión bajo.
+
+| Símbolos | Explicación |
+| **X** | un dígito del 0 al 9 |
+| **Z** | un dígito del 1 al 9 |
+| **N** | un dígito del 2 al 9 |
+| **.** | uno o más dígitos |
+| **!** | cero o más dígitos |
+
+Ejemplos:
+
+- `_6XX` &rarr; número de tres dígitos que empieza por 6.
+- `_6XX!` &rarr; número de tres o más dígitos que comienzan por 6.
+- `_655.` &rarr; número de cuatro o más dígitos que comienzan por 6.
+- `_10[2345]` &rarr; cualquiera de los números 102, 103, 104 o 105.
+- `_[3-789]` &rarr; cualquiera de los dígitos 3, 7, 8 o 9.
+- `_[89][1-8]XXXXXXX` &rarr; número de nueve cifras, comienza por 8 o 9 y cuyo segundo dígito es uno comprendido entre 1 y 8.
+
+### Uso de la Variable ${EXTEN}
+
+La variable `${EXTEN}` em Asterisk permite que la aplicación **Dial()** llame al número marcado en un patrón. Esta variable se escribe entre llaves, en mayúsculas y precedida por el símbolo **$**.
+
+`${EXTEN}` es una de las más usadas en el _dialplan_ y contiene en todo momento el último número marcado por alguna de las extensiones dentro del _context_. Esta variable sustituye al destino de una aplicación **Dial()** cuando hay un patrón de marcado.
+
+```asterisk
+[extensiones]
+
+exten => _10[1234],1,Dial(PJSIP/${EXTEN},20,tT)
+exten => _10[1234],2,Hangup()
+```
+
+### Selección de Dígitos en la Variable ${EXTEN}
+
+Cuando se utiliza `${EXTEN}` a veces es necesario seleccionar determinados dígitos de la variable, como por ejemplo, cuando el usuario debe marcar un código para acceder a línea externa, pero ese código no debe ser marcado hacia el operador.
+
+Asterisk permite seleccionar determinados dígitos o caracteres de la variable `${EXTEN}` mediante un par de valores que indican el _offset_ y el número de dígitos que se han de seleccionar. Por ejemplo: **${EXTEN:x:y}**, donde:
+
+- **x** es el _offset_ o punto de la variable donde empiezan los dígitos útiles. Si el _offset_ es un número negativo, se empieza a contar por el último dígito de la variable.
+- **y** es el número de dígitos que se han de seleccionar. Si no se indica nada, se selecciona hasta el final de la variable.
+
+Ejemplo, si el número marcado es 83102 entonces:
+
+- `${EXTEN:2}` devuelve el número 102.
+- `${EXTEN:1}` devuelve el número 3102.
+- `${EXTEN:-3}` devuelve el número 102.
+- `${EXTEN:1:3}` devuelve el número 310.
+
+### Aplicación SayNumber()
