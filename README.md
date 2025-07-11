@@ -459,3 +459,20 @@ Ejemplo, si el número marcado es 83102 entonces:
 - `${EXTEN:1:3}` devuelve el número 310.
 
 ### Aplicación SayNumber()
+
+Los patrones de marcado y la variable **${EXTEN}** pueden utilizarse junto a la aplicación **SayNumber()** para reproducir antes de la llamada el número que ha marcado el usuario.
+
+La aplicación **SayNumber()** reproduce en un mensaje de audio el número que se le pasa como argumento, que puede ser un número absoluto o, cuando se utilizan patrones de llamada, el número definido por la variable **${EXTEN}**.
+
+Ejemplo de uso de variable `${EXTEN}` junto con la aplicación `SayNumber()`.
+
+```asterisk
+[extensiones-empresa]
+
+exten => _10[1234],1,Answer(500)
+exten => _10[1234],2,SayNumber(${EXTEN})
+exten => _10[1234],3,Dial(PJSIP/${EXTEN},20,tT)
+exten => _10[1234],4,Hangup()
+```
+
+La aplicación **SayNumber()** requiere que la extensión descuelgue la llamada para lo cual se emplea la aplicación **Answer()**. Se aconseja una corta temporización para dar tiempo a la extensión a que se descuelgue la llamada, y evitar cortes de audio en la parte inicial del mensaje reproducido.
