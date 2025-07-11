@@ -19,6 +19,9 @@
     - [Uso de la Variable ${EXTEN}](#uso-de-la-variable-exten)
     - [Selección de Dígitos en la Variable ${EXTEN}](#selección-de-dígitos-en-la-variable-exten)
     - [Aplicación SayNumber()](#aplicación-saynumber)
+    - [Escritura compacta del Dialplan()](#escritura-compacta-del-dialplan)
+    - [Aplicaciones NoOP() y Verbose()](#aplicaciones-noop-y-verbose)
+  - [Música en espera](#música-en-espera)
 
 ---
 
@@ -476,3 +479,51 @@ exten => _10[1234],4,Hangup()
 ```
 
 La aplicación **SayNumber()** requiere que la extensión descuelgue la llamada para lo cual se emplea la aplicación **Answer()**. Se aconseja una corta temporización para dar tiempo a la extensión a que se descuelgue la llamada, y evitar cortes de audio en la parte inicial del mensaje reproducido.
+
+### Escritura compacta del Dialplan()
+
+El procedimiento abreviado de escritura de las prioridades, consiste en sustituir todos los valores numéricos de prioridades, excepto el primero, por la palabra clave **_next_** o su abreviatura **_n_**. Asterisk coloca de forma automática el número de prioridad a cada línea y a cualquier nueva línea insertada.
+
+Ejemplo de escritura simplificada (usando _n_) de las prioridades en el **Dialplan()**:
+
+```asterik
+[extensiones-empresa]
+
+exten => _10[1234],1,Answer(500)
+exten => _10[1234],n,SayNumber(${EXTEN})
+exten => _10[1234],n,Dial(PJSIP/${EXTEN},20,tT)
+exten => _10[1234],n,Hanhup()
+```
+
+Asterisk también simplifica la escritura del _dialplan_ mediante el uso de la palabra clave **_same_**.
+
+Ejemplo de simplificación de la escritura de los patrones de marcada usando _same_:
+
+```asterisk
+[extensiones-empresa]
+
+exten => _10[1234],1,Answer(500)
+same => n,SayNumber(${EXTEN})
+same => n,Dial(PJSIP/${EXTEN},20,tT)
+same => n,Hangup()
+```
+
+En el _dialplan_ se pueden incluir comentarios. Un comentario es todo aquello que sigue al símbolo punto y coma`;`, y se pueden poner tantos como se estime conveniente.
+
+### Aplicaciones NoOP() y Verbose()
+
+Asterisk cuenta con dos aplicaciones para facilitar la depuración de errores en el _dialplan_.
+
+- **NoOp(texto)**: muestra en el CLI el comentario o frase indicada entre paréntesis y se utiliza frecuentemente para la depuración de errores. El nivel de _verbose_ es 3 o superior. Este nivel puede ajustarse mediante el comando `core set verbose "nivel-verbose"`.
+- **Verbose(nivel, texto)**: hace la misma función, pero permite fijar el nivel de _verbose_, siendo más flexible y estando recomendado su uso.
+
+Asterisk muestra en el CLI dos tipos de mensajes diferentes para la depuración de errores. Los mensajes de tipo _versbose_ y los mensajes de tipo _debug_.
+
+- _Mensaje de tipo verbose_: dan información sobre las llamadas, así como mensajes de tipo warning o error. Con un nivel 0 de Verbose la información que se muestra es mínima, mientras que con un nivel de Verbose igual a 3 se muestra toda la información de la llamada. Son muy pocos los mensajes que puedan aparecer con un nivel de Verbose superior a 3.
+- _Mensajes de tipo debug_: dan información sobre el propio sistema Asterisk y son utilizados preferentemente por los desarrolladores cuando intentan buscar errores en el código. El nivel de debug se modifica desde el CLI de Asterisk mediante el comando `core set debug "nivel-debug"`.
+
+Para visualizar los mensajes de debug en la consola de Asterisk es necesario modificar en el fichero _logger.conf_ la línea: `console => notice.warning.error` por la línea: `console => notice.warning.error.debug` y recargar el fichero mediante el comando: `logger reload`.
+
+Al finalizar la tarea de _debug_ se debe desactivar los cambios efectuados, ya que la función activada influye directamente en el rendimiento y en el tamaño de los ficheros de _log_ generados automáticamente.
+
+## Música en espera
