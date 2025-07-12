@@ -21,7 +21,10 @@
     - [Aplicación SayNumber()](#aplicación-saynumber)
     - [Escritura compacta del Dialplan()](#escritura-compacta-del-dialplan)
     - [Aplicaciones NoOP() y Verbose()](#aplicaciones-noop-y-verbose)
-  - [Música en espera](#música-en-espera)
+  - [Música en Espera](#música-en-espera)
+    - [Uso de Clases en la Aplicación MusicOnHold()](#uso-de-clases-en-la-aplicación-musiconhold)
+      - [Instalar Paquetes de Audio en Español](#instalar-paquetes-de-audio-en-español)
+  - [Buzones de Voz](#buzones-de-voz)
 
 ---
 
@@ -526,4 +529,148 @@ Para visualizar los mensajes de debug en la consola de Asterisk es necesario mod
 
 Al finalizar la tarea de _debug_ se debe desactivar los cambios efectuados, ya que la función activada influye directamente en el rendimiento y en el tamaño de los ficheros de _log_ generados automáticamente.
 
-## Música en espera
+## Música en Espera
+
+Asterisk reproduce música en espera con la opción **m** en la aplicación **Dial()** en el transcurso de la llamada.
+
+Otra opción es usar la aplicación **MusicOnHold()** para reproducir música a voluntad mediante la marcación de un número o código de función asignado a la misma. La aplicación **MusicOnHold()** envía un archivo de audio a una extensión para su reproducción, siendo necesario que la extensión esté preparada para recibir y reproducir e archivo mediante la aplicación **Answer()**.
+
+> [!NOTE]
+>
+> La aplicación **MusicOnHold()** requiere de terminales con el sistema de manos libres.
+
+Ejemplo de aplicaciones **MusicOnHold()** y **Answer()**:
+
+```asterisk
+[operadora]
+
+exten => 102,1,Dial(PJSIP/102,20)
+exten => 102,2,Hangup()
+
+exten => 103,1,Dial(PJSIP/103,20)
+exten => 103,2,Hangup()
+
+exten => 104,1,Answer(500)
+exten => 104,2,MusicOnHold(103)
+
+exten => 8,1,Dial(PJSIP/102&PJSIP/103&PJSIP/104,30)
+exten => 8,2,Hangup()
+
+exten => 55,1,Answer(500)
+exten => 55,2,MusicOnHold(103)
+exten => 55,3,Hangup()
+
+[trabajadores]
+
+exten => 9,1,Dial(PJSIP/101,20,m)
+exten => 9,2,Hangup()
+```
+
+La aplicación _Answer()_ descuelga la llamada y pasa inmediatamente el control a la siguiente aplicación en el _dialplan_. Es recomendable asignar un _delay_ o tiempo de espera a la aplicación _Answer(500)_ (valor en ms) de espera antes de que Asterisk ejecute la siguiente aplicación en el _dialplan_.
+
+### Uso de Clases en la Aplicación MusicOnHold()
+
+Las clases de Asterisk se pueden utilizar en la aplicación **MusicOnHold()** para reproducir las melodías en espera. En función del número marcado, se reproducirán distintos archivos de audio de una u otra clase.
+
+El proceso de configuración comienza con la creación de un directorio en `/var/lib/asterisk/moh` para cada una de las clases que se van a implementar.
+
+En el fichero de configuración `_musiconhold.conf_` se indican las clases y los archivos de audio que se deben reproducir. Los nombres deben coincidir con los asignados a los directorios creados.
+
+Ejemplo de clases en el fichero _musiconhold.conf_:
+
+```asterisk
+[default]
+mode=files
+directory=moh
+
+[blues] ;este nombre de directorio debe existir en la ruta /var/lib/asterisk/moh
+mode=files
+directory=/var/lib/asterisk/moh/blues
+sort=random
+
+[rock] ;este nombre de directorio debe existir en la ruta /var/lib/asterisk/moh
+mode=files
+directory=/var/lib/asterisk/moh/rock
+sort=random
+
+[pop] ;este nombre de directorio debe existir en la ruta /var/lib/asterisk/moh
+mode=files
+directory=/var/lib/asterisk/moh/pop
+sort=random
+```
+
+El fichero de configuración `_musiconhold.conf_` se debe recargar desde la consola de Asterisk mediante el comando `moh reload`.
+
+Se deben añadir aplicaciones _MusicOnHold()_ en el fichero **extensions.conf** de la siguiente manera:
+
+```asterisk
+[operadora]
+;música en espera clase default
+exten => 101,1,Answer(500)
+exten => 102,2,MusicOnHold(default)
+exten => 102,3,Hangup()
+
+;música en espera clase blues
+exten => 103,1,Answer(500)
+exten => 103,2,MusicOnHold(blues)
+exten => 103,3,Hangup()
+
+;música en espera clase rock
+exten => 104,1,Answer(500)
+exten => 104,2,MusicOnHold(rock)
+exten => 104,3,Hangup()
+
+;música en espera clase pop
+exten => 105,1,Answer(500)
+exten => 105,2,MusicOnHold(pop)
+exten => 105,3,Hangup()
+```
+
+En el directorio _digits_ se encuentran los mensajes de audio que permiten reproducir los números marcados. En este directorio se encuentran los ficheros de audio de los números del 0 a 20, para las decenas 30, 40, 50, 60, 70, 80 y 90, además de audios para las centenas, el millar y otras cantidades superiores.
+
+> [!NOTE]
+> Paquete **Core.zip**: contiene mensajes de voz habituales en español.
+> Paquete **Extra.zip**: contiene mensajes extras de voz habituales en español.
+
+#### Instalar Paquetes de Audio en Español
+
+- Acceder al directorio `/var/lib/asterisk/sounds/`.
+- Si existe el directorio `/es` eliminarlo con el comando `rm -R es`.
+- Crear el directorio `/es` con el comando `mkdir es`.
+- Acceder al directorio `/es` con el comando `cd es`.
+- Descargar el paquete `Core.zip` con el comando `wget http://downloads.asterisk.org/pub/telephony/Core.zip`.
+- Descargar el paquete `Extra.zip` con el comando `wget http://downloads.asterisk.org/pub/telephony/Extra.zip`.
+- Descomprimir el paquete `Core.zip` con el comando `unzip Core.zip`.
+- Descomprimir el paquete `Extra.zip` con el comando `unzip Extra.zip`.
+
+Con ambos paquetes se dispone de mensajes de audio en formato `wav` junto con directorios: _dictate_, _digits_, _letters_, _phonetic_ dentro del directorio `/es`.
+
+El cambio de idioma para todas las extensiones se lleva a cabo en el fichero **extensions.conf** situado en el directorio **/etc/asterisk** descomentando la línea `defaultlanguage=en` y sustituirla por la línea `defaultlanguage=es`. A continuación se ejecuta desde la consola de Asterisk el comando `core restart now`.
+
+- `core restart now` finaliza todas las llamadas en curso y reinicia el servicio de Asterisk de forma inmediata.
+- `core restart gracefully` no permite la entrada de nuevas llamadas y espera a que finalicen las llamadas en curso para efectuar el reinicio.
+- `core restart when convenient` espera para reiniciar a que finalicen las llamadas en curso, permitiendo mientras tanto la entrada de nuevas llamadas.
+
+Independientemente de la configuración del idioma para todas las extensiones, también es posible ajustar de forma individual para cada extensión el idioma deseado, añadiendo la línea `language=es` al final de la sección de la extensión correspondiente en el fichero **pjsip.conf**.
+
+Ejemplo de ajuste del idioma para cada extensión:
+
+```asterisk
+[capa-transporte]
+type=transport
+protocol=udp
+bind=0.0.0.0
+port=5060
+
+[101]
+type=endpoint
+context=extensiones-empresa
+disallow=all
+allow=alaw
+aors=101
+auth=auth101
+transport=capa-transporte
+language=es ;ajuste del idioma para la extensión 101
+```
+
+## Buzones de Voz
