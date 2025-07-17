@@ -26,6 +26,10 @@
       - [Instalar Paquetes de Audio en Español](#instalar-paquetes-de-audio-en-español)
   - [Buzones de Voz](#buzones-de-voz)
   - [Aplicaciones de Llamadas de Uso Común](#aplicaciones-de-llamadas-de-uso-común)
+    - [Llamada Temporizada a Grupo de Extensiones](#llamada-temporizada-a-grupo-de-extensiones)
+    - [Llamada a Múltipes Contactos por Extensión](#llamada-a-múltipes-contactos-por-extensión)
+    - [Captura de Llamadas](#captura-de-llamadas)
+    - [Captura Dirigida de Llamadas](#captura-dirigida-de-llamadas)
 
 ---
 
@@ -751,3 +755,154 @@ Opciones de la locución de Asterisk tras introducir el PIN de forma correcta:
 - _Presione * para ayuda_.
 
 ## Aplicaciones de Llamadas de Uso Común
+
+Asterisk dispone de aplicaciones específicas para realizar llamadas con características especiales:
+
+- Llamada temporizada a grupo de extensiones.
+- Llamada a múltiples contactos por extensión.
+- Captura de llamadas.
+- Captura dirigida de llamadas.
+
+### Llamada Temporizada a Grupo de Extensiones
+
+La aplicación **Dial()** permite realizar llamadas a un grupo de extensiones sonando todas al mismo tiempo. La función **Local Channel** permite llamadas temporizadas a grupos de extensiones.
+
+La configuración se realiza en la aplicación **Dial()** con la palabra clave `Local`, seguida  de un identificador de la extensión, el símbolo `@` y un nombre de contexto.
+
+En el _dialplan_ se añade este nuevo contexto con la aplicación **Wait()** configurada con los segundos de temporización deseados y la aplicación **Dial()** con la llamada a cada una de las extensiones del grupo temporizado.
+
+La sintaxis de la llamada a grupo es: `exten => número-grupo, prioridad, Dial(Local/ext1@context&Local/ext2@context...)`.
+
+El _context_ es la sección donde se indican las extensiones que forman parte del grupo de llamada y la temporización que tiene cada una de ellas.
+
+Ejemplo de llamada a grupo temporizado:
+
+```asterisk
+[extensiones-empresa]
+
+; llamada temporizada al grupo de extensiones 101, 102 y 103
+
+exten => 80,1,Dial(Local/ext101@GrupoExt&Local/ext102@GrupoExt&Local/ext102@GrupoExt)
+same  => n,Hangup()
+
+; context donde se establecen las extensiones del grupo de llamada y la temporización
+
+[GrupoExt]
+
+exten => ext101,1,Dial(PJSIP/101)
+
+exten => ext102,1,Wait(5)
+same  => n,Dial(PJSIP/102)
+
+exten => ext103,1,Wait(15)
+same  => n,Dial(PJSIP/103)
+```
+
+### Llamada a Múltipes Contactos por Extensión
+
+Si se requiere que suenen todas las extensiones a la vez cuando el número de extensión recibe una llamada. Útil en la modalidad de teletrabajo, dos terminales en distinto lugar pero con el mismo número de extensión.
+
+Asterisk usa la función **PJSIP_DIAL_CONTACTS**, la cual se inserta en el interior de la aplicación **Dial()** y devuelve a esta una cadena de marcado con la localización de las extensiones registradas con el número de extensión al que se está llamando. Cuando una extensión descuelga la llamada, el resto se desconecta.
+
+Esta función requiere registrar más de una extensión con el mismo número, siendo necesario configurar el parámetro `max_contacts` en la sección de tipo `aor` del fichero **pjsip.conf**, con el valor del número de extensiones para registrar con el mismo número.
+
+Ejemplo de configuración de `max_contacts`:
+
+```asterisk
+[101]
+
+type=endpoint
+context=extensiones-empresa
+disallow=all
+allow=alaw
+aors=101
+auth=auth101
+transport=capa-transporte
+
+[101]
+
+type=aor
+max_contacts=2      ;extensiones registradas con el mismo número
+remove_existing=yes
+
+[auth101]
+
+type=auth
+username=101
+password=123456789101
+```
+
+La llamada simultánea a varias extensiones con el mismo número se consigue modificando la aplicación **Dial()** con la función **PJSIP_DIAL_CONTACTS**.
+
+Ejemplo de llamada a múltiples contactos por extensión:
+
+```asterisk
+[extensiones-empresa]
+
+; llamada a múltiples contactos por extensión 101
+
+exten => 101,1,Dial(${PJSIP_DIAL_CONTACTS(101)},20)
+```
+
+> [!NOTE]
+>
+> Para consultar las funciones disponibles del _dialplan_ usar el comando `core show functions`.
+
+### Captura de Llamadas
+
+Cuando suena una extensión en un puesto de trabajo, cualquier otro usuario puede capturar la llamada y atenderla.
+
+La configuración se realiza en el fichero **pjsip.conf** mediante los parámetros `call_group` y `pickup_group`.
+
+- `call_group`: indica el grupo de extensiones que se van a capturar.
+- `pickup_group`: indica el grupo de extensiones que se van a atender.
+
+Ejemplo de configuración de `call_group` y `pickup_group`:
+
+```asterisk
+[102]
+
+type=endpoint
+context=extensiones-empresa
+disallow=all
+allow=alaw
+aors=102
+auth=auth102
+transport=capa-transporte
+call_group=1              ;pertenece al grupo de llamadas 1
+pickup_group=1            ;puede capturar llamadas de cualquier otra extensión que pertenezca al grupo 1
+
+[102]
+
+type=aor
+max_contacts=1
+remove_existing=yes
+
+[auth102]
+
+type=auth
+username=102
+password=123456789102
+```
+
+La combinación de `call_group` y `pickup_group` permite que una extensión pueda capturar una llamada y atender la llamada que suena en otras extensiones, pero que ninguna extensión pueda capturar las llamadas dirigidas a ella. Se pueden especificar varios grupos de captura, separando con comas los identificadores numéricos de cada grupo, por ejemplo: `call_group=1,2,3` para capturar llamadas de grupos 1, 2 y 3.
+
+La captura de la llamada que está sonando en una extensión de un grupo de captura se lleva a cabo mediante el valor asignado al parámetro `pickupexten` en el fichero **features.conf**, que por defecto es: `*8`.
+
+Ejemplo de valor por defecto de `pickupexten` en el fichero **features.conf**:
+
+```asterisk
+[general]
+
+transferdigittimeout => 3   ;Number of seconds to wait between digits when transferring a call
+xfersound = beep            ;to indicate an attended transfer is complete
+xferfailsound = beeperr     ;to indicate a failed transfer
+pickupexten = *8            ;Configure the pickup extension
+pickupsound = beep
+pickupfailsound = beeperr
+featuredigittimeout = 1000
+```
+
+Para recargar el fichero **features.conf** se debe ejecutar el comando `reload features` desde la consola de Asterisk.
+
+### Captura Dirigida de Llamadas
