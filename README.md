@@ -25,6 +25,7 @@
     - [Uso de Clases en la Aplicación MusicOnHold()](#uso-de-clases-en-la-aplicación-musiconhold)
       - [Instalar Paquetes de Audio en Español](#instalar-paquetes-de-audio-en-español)
   - [Buzones de Voz](#buzones-de-voz)
+  - [Aplicaciones de Llamadas de Uso Común](#aplicaciones-de-llamadas-de-uso-común)
 
 ---
 
@@ -674,3 +675,79 @@ language=es ;ajuste del idioma para la extensión 101
 ```
 
 ## Buzones de Voz
+
+Un buzón de voz permite a los usuarios que llaman a una extensión dejar un mensaje de voz cuando su llamada no es atendida, pudiendo ser consultado estos mensajes de voz en cualquier momento.
+
+Los buzones de voz se crean en el fichero **voicemail.conf** y se utiliza la aplicación **Voicemail()** para permitir a los usuarios dejar mensajes de voz.
+
+Los propietarios de los buzones pueden consultar el contenido, mediante la aplicación **VoicemailMain()**.
+
+> [!NOTE]
+> **Voicemail()**
+> Es el fichero donde se crean los buzones.
+> A cada buzón se le asigna un número de identificación y un PIN de acceso para el propietario.
+> Permite almacenar un mensaje de voz cuando la llamada no es atendida.
+>
+> **VoicemailMain()**
+> Permite al propietario consultar mensajes de voz.
+
+Los buzones se configuran dentro de una sección _default_ en el fichero **voicemail.conf**. Donde cada uno de los buzones se identifica por un número, que puede ser el mismo que tiene la extensión a la que está asociado el buzón o cualquier otro de libre elección.
+
+Cada buzón de voz tiene un número de identificación personal PIN (_personal identification number_) que debe marcar el propietario para consultar los mensajes de almacenados.
+
+Para recargar el fichero una vez realizadas las modificaciones en el fichero **voicemail.conf**, se debe ejecutar el comando `voicemail reload` desde la consola de Asterisk.
+
+Código de ejemplo de confituración de buzones en el fichero **voicemail.conf**:
+
+```asterisk
+[default]
+
+; Nº extensión y PIN de acceso para el propietario
+1001 = 12345
+
+; Nº extensión y PIN de acceso para el propietario
+1002 = 55269
+```
+
+La aplicación **Voicemail()** permite al usuario que llama a una extensión, dejar un mensaje de voz en su buzón y debe ir a continuación de la aplicación **Dial()**. El buzón se activa cada vez que una llamada no es atendida en el tiempo fijado por el parámetro **_timeout_** de la aplicación **Dial()**.
+
+La aplicación **VoiceMail()** tiene como parámetros el identificador del buzón, que habitualmente es el mismo número que tiene la extensión y la sección del fichero **voicemail.conf**, y el PIN de acceso.
+
+- `Voicemail(identificador-buzón@default)`
+
+La aplicación **VoicemailMain()** permite a un usuario consultar su buzón de voz, marcando el número asignado en el _dialplan_. Esta aplicación cuenta con una serie de locuciones de audio que guían al usuario para la introducción del número de acceso personal o PIN, la consulta de los mensajes de voz almacenados o el borrado de alguno de ellos.
+
+Ejemplo de configuración de buzones en el _dialplan_:
+
+```asterisk
+[extensiones-empresa]
+
+; llamadas entre extensiones con buzón de voz si no contestan en 20"
+
+exten => _10[1234],1,Dial(PJSIP/${EXTEN},20,tT)
+same  => n,Voicemail(${EXTEN}@default)
+same  => n,Hangup()
+
+; consultas de los buzones de voz de cada extensión
+
+exten => 81,1,VoicemailMain(101@default)
+exten => 82,1,VoicemailMain(102@default)
+exten => 83,1,VoicemailMain(103@default)
+exten => 84,1,VoicemailMain(104@default)
+```
+
+Cada una de las cuatro extensiones de la centralita tiene un buzón de voz asociado que puede ser consultado por el propietario marcando los número 81, 82, 83 y 84. Y cuando la aplicación **VoicemailMain()** lo solicite, el PIN de acceso al buzón.
+
+Cuando se llama a una extensión que tiene un buzón de voz asociado y nadie atiende la llamada en el tiempo fijado por el _timeout_ de la aplicación **Dial()**, se reproduce un audio del tipo: _"Dejar mensaje después del tono, y pulsar la tecla almohadilla"_.
+
+Cuando el propietario de un buzón marca el número asignado en el _dialplan_ para el acceso a su buzón de voz, Asterisk le solicitará la marcación del PIN y si es correcto, reproducirá la locución grabada, número de mensajes no escuchados y número de mensajes escuchados pero no guardados.
+
+Opciones de la locución de Asterisk tras introducir el PIN de forma correcta:
+
+- _Presione 1 para mensajes no escuchados_.
+- _Presione 2 para cambiar de carpeta_.
+- _Presione 3 para opciones avanzadas_.
+- _Presione 0 para opciones del buzón de voz_.
+- _Presione * para ayuda_.
+
+## Aplicaciones de Llamadas de Uso Común
