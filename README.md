@@ -30,6 +30,7 @@
     - [Llamada a Múltipes Contactos por Extensión](#llamada-a-múltipes-contactos-por-extensión)
     - [Captura de Llamadas](#captura-de-llamadas)
     - [Captura Dirigida de Llamadas](#captura-dirigida-de-llamadas)
+  - [Bifurcaciones, Variables y la Base de Datos de Asterisk](#bifurcaciones-variables-y-la-base-de-datos-de-asterisk)
 
 ---
 
@@ -906,3 +907,27 @@ featuredigittimeout = 1000
 Para recargar el fichero **features.conf** se debe ejecutar el comando `reload features` desde la consola de Asterisk.
 
 ### Captura Dirigida de Llamadas
+
+La captura de llamadas mediante la marcación del valor fijado en `pickupexten` es una captura de llamadas no dirigidas. Suenan simultáneamente dos o más extensiones dentro de un grupo de captura, no es posible capturar la llamada de una de las extensiones en particular, sino que se captura automáticamente la llamada de la primera extensión que ha comenzado a sonar.
+
+La captura dirigida de llamadas permite capturar la llamada que suena en una extensión en particular y se realiza mediante la aplicación **Pickup()** en el _dialplan_.
+
+Ejemplo de la aplicación **Pickup()**:
+
+```asterisk
+[extensiones-empresa]
+
+; captura dirigida de llamadas
+
+exten => _10[1234],1,Dial(PJSIP/${EXTEN})
+same  => n,Hangup()
+
+; captura dirigida de llamadas
+
+exten => _#810X,1,Pickup(${EXTEN:2})
+same  => n,Hangup()
+```
+
+Cualquier extensión del _context_ puede capturar una llamada que suena en otra extensión marcando el código `#8` seguido del número de extensión para capturar.
+
+## Bifurcaciones, Variables y la Base de Datos de Asterisk
