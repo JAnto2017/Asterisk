@@ -31,6 +31,8 @@
     - [Captura de Llamadas](#captura-de-llamadas)
     - [Captura Dirigida de Llamadas](#captura-dirigida-de-llamadas)
   - [Bifurcaciones, Variables y la Base de Datos de Asterisk](#bifurcaciones-variables-y-la-base-de-datos-de-asterisk)
+    - [Base de Datos de Asterisk](#base-de-datos-de-asterisk)
+  - [Configuración de Teclas BLF](#configuración-de-teclas-blf)
 
 ---
 
@@ -931,3 +933,118 @@ same  => n,Hangup()
 Cualquier extensión del _context_ puede capturar una llamada que suena en otra extensión marcando el código `#8` seguido del número de extensión para capturar.
 
 ## Bifurcaciones, Variables y la Base de Datos de Asterisk
+
+La aplicación **GotoIf()** permite realizar bifurcaciones en el _dialplan_ en función del valor que toma una variable. La sintaxis es la siguiente: `GotoIf(expresión?destino1:destino2)`.
+
+La aplicación **GotoIf()** evalúa si la expresión indicada es cierta o falsa y en función del resultado continúa la ejecución del _dialplan_ por un punto u otro.
+
+- Si es cierta, se ejecuta el destino 1.
+- Si es falsa, se ejecuta el destino 2.
+
+Ejemplo de la aplicación **GotoIf()** dentro del mismo contexto:
+
+```asterisk
+[extensiones-empresa]
+
+; bifurcación dentro del mismo contexto
+
+exten => xxx,1,GotoIf(expresión?menu1:menu2)
+same  => n,...
+same  => n,...
+same  => n,(destino1),...
+same  => n,...
+same  => n,Hangup()
+
+; bifurcación dentro del mismo contexto
+
+same  => n,(destino2),...
+same  => n,...
+same  => n,Hangup()
+```
+
+La expresión que se evalúa en la aplicación **GotoIf()** puede ser una variable local o global, a las que se asigna un valor numérico o una cadena alfanumérica. La asignación de un valor a una variable se lleva a cabo mediante la aplicación **Set()**.
+
+- `Set(nombre-variable = valor)` asigna un valor a una variable local.
+- `Set(GLOBAL(variable-global) = valor)` asigna un valor a una variable global.
+
+> [!NOTE]
+> El uso de **_Hangup()_** en el _dialplan_ cuando existen bifurcaciones, evita que se ejecute las dos ramas.
+
+La aplicación **GotoIf()** se utiliza para programar funciones como por ejemplo "no molestar", que rechaza las llamadas a una extensión cuando está activada.
+
+Ejemplo de la aplicación **GotoIf()** con bifurcación de no molestar:
+
+```asterisk
+[director]
+
+exten => _10[234],1,Dial(PJSIP/${EXTEN})
+same  => n,Hangup()
+
+; activación de no molestar mediante el número 60
+
+exten => 60,1,Set(GLOBAL(no_molestar_director)=1)
+same  => n,Hangup()
+
+; desactivación de no molestar mediante el número 61
+
+exten => 61,1,Set(GLOBAL(no_molestar_director)=0)
+same  => n,Hangup()
+
+[empleados]
+
+exten => 101,1,GotoIf($[${no_molestar_director}=1]?no-molestar:llamar)
+same  => n,Hangup()
+
+same  => n,(no-molestar),Playback(do-not-disturb)
+same  => n,Hangup()
+
+same  => n,(llamar),Dial(PJSIP/${EXTEN})
+same  => n,Hangup()
+```
+
+La extensión 101 situada en el contexto _director_ puede activar su estado de no molestar marcando el número 60 y puede desactivarlo marcando el número 61. La aplicación **GotoIf()** evalúa esta variable cada vez que se llama a dicha extensión.
+
+> [!CAUTION]
+> Cuando se reinicia Asterisk, las variables locales y globales pierden el valor asignado. Para guardar el estado del sistema se usan bases de datos.
+
+### Base de Datos de Asterisk
+
+Asterisk incluye en su núcleo una base de datos denominada **SQlite3**. Donde la información se almacena en una variables denominadas _clave:valor_, agrupadas en _familias_.
+
+La escritura en la base de datos se lleva a cabo asignando un valor a una clave de una determinada familia mediante la aplicación **Set()**.
+
+- Escritura: `Set(familia(clave) = valor)`.
+
+La lectura se lleva a cabo asignando a una variable el contenido de una clave de una determinada familia, también mediante la aplicación **Set()**.
+
+- Lectura: `Set(variable=${DB(familia(clave)})`.
+
+La base de datos de Asterisk permite implementar funciones como el desvío de llamadas, en el que cada extensión puede guardar en la base de datos su número de extensión verdadero cuando no está desviada o el número de extensión de desvío cuando está desviada.
+
+Ejemplo de función de desvío de llamadas:
+
+```asterisk
+[extensiones-empresa]
+
+exten => _10[1234],1,Set(numero=${DB(desvio-ext/${EXTEN})})
+same  => n,Dial(PJSIP/${numero})
+same  => n,Hangup()
+
+; activación del desvío de una extensión mediante el número 40XXX donde XXX es el número de desvío
+
+exten => _40XXX,1,Set(DB(desvio-ext/${CALLERID(num)})=${EXTEN:2})
+same  => n,Hangup()
+
+; desactivación del desvío mediante el número 41
+
+exten => 41,1,Set(DB(desvio-ext/${CALLERID(num)})=${CALLERID(num)})
+same  => n,Hangup()
+```
+
+La variable de Asterisk `${CALLERID(num)}` contiene el número de extensión que llama, y la variable de Asterisk `${EXTEN:2}` contiene los tres últimos dígitos marcados por el usuario al activar el desvío.
+
+- Cada extensión tiene asignada una clave en la BD identificada por el propio número de la extensión. Esta clave puede contener el número correspondiente a otra extensión (desvío activado) o el número correspondiente a ella misma (desvío desactivado).
+- Al activar el desvío se asigna a la clave de la extensión a desactivar, el número de la extensión a la que se desvía, y en la cancelación se asigna a la clave de la extensión su verdadero número de extensión.
+- Cuando se llama a una extensión, se busca en la BD el número asignado a la clave de la extensión llamada, y se marca mediante la aplicación **Dial()**.
+
+## Configuración de Teclas BLF
