@@ -30,9 +30,10 @@
     - [Llamada a Múltipes Contactos por Extensión](#llamada-a-múltipes-contactos-por-extensión)
     - [Captura de Llamadas](#captura-de-llamadas)
     - [Captura Dirigida de Llamadas](#captura-dirigida-de-llamadas)
-  - [Bifurcaciones, Variables y la Base de Datos de Asterisk](#bifurcaciones-variables-y-la-base-de-datos-de-asterisk)
+    - [Bifurcaciones, Variables y la Base de Datos de Asterisk](#bifurcaciones-variables-y-la-base-de-datos-de-asterisk)
     - [Base de Datos de Asterisk](#base-de-datos-de-asterisk)
-  - [Configuración de Teclas BLF](#configuración-de-teclas-blf)
+    - [Configuración de Teclas BLF](#configuración-de-teclas-blf)
+  - [Enlaces SIP en Asterisk](#enlaces-sip-en-asterisk)
 
 ---
 
@@ -932,7 +933,7 @@ same  => n,Hangup()
 
 Cualquier extensión del _context_ puede capturar una llamada que suena en otra extensión marcando el código `#8` seguido del número de extensión para capturar.
 
-## Bifurcaciones, Variables y la Base de Datos de Asterisk
+### Bifurcaciones, Variables y la Base de Datos de Asterisk
 
 La aplicación **GotoIf()** permite realizar bifurcaciones en el _dialplan_ en función del valor que toma una variable. La sintaxis es la siguiente: `GotoIf(expresión?destino1:destino2)`.
 
@@ -1047,4 +1048,55 @@ La variable de Asterisk `${CALLERID(num)}` contiene el número de extensión que
 - Al activar el desvío se asigna a la clave de la extensión a desactivar, el número de la extensión a la que se desvía, y en la cancelación se asigna a la clave de la extensión su verdadero número de extensión.
 - Cuando se llama a una extensión, se busca en la BD el número asignado a la clave de la extensión llamada, y se marca mediante la aplicación **Dial()**.
 
-## Configuración de Teclas BLF
+### Configuración de Teclas BLF
+
+El tejéfono principal cuenta con uno o varios módulos de extensión con teclas donde se visualiza el estado de las extensiones. Esta información permite saber si una extensión está libre y por tanto, se puede pasar una llamada.
+
+Las teclas de los módulos de extensión se configuran en modo BLF (Bussy Lamp Field) y su funcionamiento se basa en el uso de los mensajes _SUBSCRIBE_ y _NOTIFY_. Ambos constituyen una extensión del protocolo SIP permitiendo que un teléfono conozca el estado de otra extensión.
+
+- Mensaje SUSCRIBE: cuando un dispositivo cliente A desea conocer los cambios de estado de un dispositivo B, envía un mensaje SUBSCRIBE al dispositivo B o al servidor SIP que conoce en todo momento el estado de B.
+- Mensaje NOTIFY: cada vez que el dispositivo B cambia de estado, envía un mensaje de tipo NOTIFY al dispositivo A, bien directamente o bien a través del servidor SIP que conoce el estado de B.
+
+Los mensajes de tipo SUBSCRIBE son enviados hacia Asterisk y es el que envía los correspondientes NOTIFY cada vez que una extensión cambia de estado.
+
+La implementación de este mecanismo en Asterisk se logra a través de los denominados _hint_, que constituyen una relación entre el dispositivo físico cuyo estado se requiere conocer y un nombre arbitrario o etiqueta que identifica a esa monitorización de estado.
+
+La configuración de los _hits_ se lleva a cabo en el fichero **extensions.conf** situado en el directorio **/etc/asterisk**. Dentro del _context_ de la extensión de operadora, que es la extensión que monitoriza el estado del resto de teléfonos.
+
+> [!TIP]
+> El envío de mensajes SUBSCRIBE lo hace automáticamente el teléfono que cuenta con el módulo de extensión de teclas BLF. Enviando un mensaje de este tipo por cada tecla BLF configurada.
+> Los _hint_ le indican a Asterisk las extensiones a monotorizar y el envío de mensajes NOTIFY cada vez que cambia de estado.
+
+Ejemplo de configuración de _hint_ en el archivo **extensions.conf**:
+
+```asterisk
+[extensiones-empresa]
+
+; llamadas internas entre extensiones
+
+exten => _10[1234],1,Dial(PJSIP/${EXTEN},20,tT)
+same  => n,Hangup()
+
+; configuración de HITS para las teclas BLF
+
+exten => 101,hint,PJSIP/101
+exten => 102,hint,PJSIP/102
+exten => 103,hint,PJSIP/103
+exten => 104,hint,PJSIP/104
+exten => 105,hint,PJSIP/105
+```
+
+Para el ejemplo anterior, el teléfono de operadora debe tener un módulo de extensión con las teclas de tipo BLF tanto físico como softphone. En este último caso el softphone de libre uso **tSIP** disponible en la web:
+
+- [tSIP](https://github.com/tomek-o/tSIP)
+- [Tsip](https://tomeko.net/software/SIPclient/)
+
+La configuración de las tecas BLF se lleva a cabo editando las propiedades de cada una de ellas después de serleccionarlas con el botón derecho.
+
+> [!NOTE]
+> Los mensajes de tipo SUBSCRIBE se reenvían al cabo de un tiempo fijado de 600 segundos.
+> Se puede forzar el envío de mensajes SUBSCRIBE en tSIP cerrando e iniciando de nuevo la aplicación.
+
+---
+
+## Enlaces SIP en Asterisk
