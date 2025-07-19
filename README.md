@@ -34,6 +34,8 @@
     - [Base de Datos de Asterisk](#base-de-datos-de-asterisk)
     - [Configuración de Teclas BLF](#configuración-de-teclas-blf)
   - [Enlaces SIP en Asterisk](#enlaces-sip-en-asterisk)
+    - [Enlace SIP Entre Dos Centralitas Asterisk](#enlace-sip-entre-dos-centralitas-asterisk)
+    - [Enlace SIP a Través de Router](#enlace-sip-a-través-de-router)
 
 ---
 
@@ -195,7 +197,7 @@ Es la más importante de Asterisk y su función es realizar llamadas. La aplicac
 
 La aplicación **Dial()** se puede utilizar en su forma básica, sin ningún parámetro opcional. El parámetro **timeout** establece el número de segundos durantel cual se envía la llamada al destino, finalizando de forma automática si no es descolgada en el tiempo indicado.
 
-![alt text](image.png "Ejemplo de aplicación Dial()")
+![alt text](imag/image.png "Ejemplo de aplicación Dial()")
 
 ```asterisk
 [operadora]
@@ -1100,3 +1102,79 @@ La configuración de las tecas BLF se lleva a cabo editando las propiedades de c
 ---
 
 ## Enlaces SIP en Asterisk
+
+Un enlace SIP permite conectar una centralita Asterisk con otras centralitas o con la red de telefonía pública a través de un operador de voz sobre IP (VoIP).
+
+Asterisk puede realizar llamadas a extensiones de la centralita situada en el otro extremo del enlace y recibir llamadas desde ella, mientras que a través de un enlace SIP con un operador de VoIP. Asterisk puede realizar llamadas a teléfonos fijos y móviles de la red pública de telefonía.
+
+Los enlaces SIP se suelen denominar también como troncales o _trunk_ SIP. Se pueden realizar tres modalidades de enlace SIP: enlaces directos entre centralitas Asterisk, los enlaces a través de router y los enlaces con un operador de VoIP.
+
+### Enlace SIP Entre Dos Centralitas Asterisk
+
+Puede ser establecida entre dos o más PBX IP o entre una PBX IP y el operador de VoIP que le presta servicio para el acceso a la red pública de telefonía.
+
+La configuración del enlace se realiza en el fichero **pjsip.conf** situado en el directorio **/etc/asterisk**.
+
+![alt text](imag/image-1.png "Ejemplo de enlace SIP entre dos centralitas Asterisk")
+
+En cada una de las centralitas se debe configurar el enlace IP con la otra centralita en sus respectivos ficheros **pjsip.conf** y **extensions.conf**.
+
+![alt text](imag/image-2.png "Configuración de un enlace SIP en pjsip.conf")
+
+- Si dentro de la sección de tipo `type=identify` el valor de la dirección IP asignado a la opción de configuración `mach` es incorrecto, se puede hacer llamadas salientes a la otra centralita, pero no es posible recibir llamadas entrantes desde aquella.
+- Si dentro de la sección de tipo `type=aor` el valor de la dirección IP asignado a la opción de configuración `contact`es incorrecto, se pueden recibir llamadas desde la otra centralita, pero no es posible efectuar llamadas hacia ella.
+- El nombre asignado al parámetro `context` dentro de la sección `Endpoint` indica el contexto donde son tratadas las llamadas entrantes por el enlace en cada uno de los respectivos ficheros **extensions.conf**.
+
+Ejemplo de configuración básica de los respectivos ficheros **extensions.conf**:
+
+```asterisk
+; configuración deextensiones de la centralita 1 (Asterisk-1)
+
+[extensiones-empresa]
+
+; llamadas internas entre extensiones
+
+exten => _10[1234],1,Dial(PJSIP/${EXTEN},20,tT)
+same  => n,Hangup()
+
+; llamadas salientes por e enlace con Asterisk 2
+
+exten => _20[1234],1,Dial(PJSIP/${EXTEN}@asterisk-2)
+same  => n,Hangup()
+
+; llamadas entrantes por el enlace con Asterisk 2
+
+[llamadas-entrantes]
+
+exten => _10[1234],1,Dial(PJSIP/${EXTEN},20,tT)
+same  => n,Hangup()
+```
+
+```asterisk
+; configuración deextensiones de la centralita 2 (Asterisk-2)
+
+[extensiones-empresa]
+
+; llamadas internas entre extensiones
+
+exten => _20[1234],1,Dial(PJSIP/${EXTEN},20,tT)
+same  => n,Hangup()
+
+; llamadas salientes por el enlace con Asterisk 1
+
+exten => _10[1234],1,Dial(PJSIP/${EXTEN}@asterisk-1)
+same  => n,Hangup()
+
+; llamadas entrantes por el enlace con Asterisk 2
+
+[llamadas-entrantes]
+
+exten => _20[1234],1,Dial(PJSIP/${EXTEN},20,tT)
+same  => n,Hangup()
+```
+
+Cuando una centralita hace llamadas internas o salientes, éstas son producidas por la marcación de extensiones de la propia centralita y Asterisk evalúa esas marcaciones en el _context_ de cada extensión.
+
+Por el contrario, cuando una centralita recibe llamadas entrantes a través del enlace SIP, esas llamadas son producidas por la marcación de extensiones de la otra centralita y Asterisk evalúa esas marcaciones en el _context_ del enlace.
+
+### Enlace SIP a Través de Router
