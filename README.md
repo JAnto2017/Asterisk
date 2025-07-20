@@ -36,6 +36,7 @@
   - [Enlaces SIP en Asterisk](#enlaces-sip-en-asterisk)
     - [Enlace SIP Entre Dos Centralitas Asterisk](#enlace-sip-entre-dos-centralitas-asterisk)
     - [Enlace SIP a Través de Router](#enlace-sip-a-través-de-router)
+  - [Enlace SIP con un Operador de VoIP](#enlace-sip-con-un-operador-de-voip)
 
 ---
 
@@ -1178,3 +1179,179 @@ Cuando una centralita hace llamadas internas o salientes, éstas son producidas 
 Por el contrario, cuando una centralita recibe llamadas entrantes a través del enlace SIP, esas llamadas son producidas por la marcación de extensiones de la otra centralita y Asterisk evalúa esas marcaciones en el _context_ del enlace.
 
 ### Enlace SIP a Través de Router
+
+El uso de enlaces SIP entre centralitas usando el _router_ a través de Internet suministrado por un operador de telecomunicaciones.
+
+La seañal SIP y el flujo de audio RTP debe atravesar los respectivos _router_ que conectan la parte LAN y la parte WAN en cada centralita, siendo necesario realizar una configuración específica en los enlaces definidos en los ficheros **pjsip.conf** y **extensions.conf**, además de los propios _router_.
+
+La configuración del enlace a través de los _router_ debe tener en cuenta_
+
+- Para el _Asterisk-1_, la dirección IP del enlace con el _Asterisk-2_, es la que tiene el _router_ del _Asterisk-2_ en la interfaz WAN.
+- Para el _Asterisk-2_, la dirección IP del enlace con el _Asterisk-1_, es la que tiene el _router_ del _Asterisk-1_ en la interfaz WAN.
+- Para cada Asterisk, la dirección de puerta de enlace (_gateway_), es la IP del LAN de su propio _router_.
+
+![alt text](imag/image-3.png "Esquema de enlace entre Asterisk a través de router")
+
+Un aspecto importante, es que al realizar una llamada mediante SIP, la extensión que envía el mensaje INVITE coloca dentro del cuerpo del mensaje, el protocolo SDP, su propia dirección IP, indicando con ello donde espera recibir el flujo de audio. La extensión que recibe la llamada también informa de dónde quiere recibir el audio, colocando su dirección IP dentro del protocolo SDP incluido en la respuesta 200 OK. Es es así, porque en SIP se permiten las llamadas directas entre terminales, en la que cada terminal debe comunicar al otro, la dirección IP donde espera recibir el flujo de audio RTP.
+
+> [!TIP]
+> Si ambas extensiones están en la misma red funciona correctamente.
+> Si están en redes distintas separadas por un _router_, el sistema no directamente alcanzable y falla.
+
+Si usamos redes distintas el sistema no es directamente alcanzable, tener en cuenta:
+
+- Cada extensión debe conocer la dirección IP de lado WAN de su _router_, y esta es la dirección IP donde debe recibir el flujo de audio desde la otra extensión.
+- La modificación anterior de la dirección IP donde se espera recibir el flujo de audio, solo debe llevarse a cabo en las llamadas externas, realizándose este proceso mediante la configuración en el fichero **pjsip.conf** de los parámetros `local_net`,  `external_media_address` y `external_signaling_address`, todos ellos dentro de la sección de tipo `transport`.
+- Es necesario configurar en cada _router_ el reenvío de puertos o `port forwarding` para la señalización SIP.
+
+Ejemplo de sección `transport` en el fichero **pjsip.conf** del Asterisk-1:
+
+```asterisk
+; === definición del tipo de transporte ===
+[capa-transporte]
+type=transport
+protocol=udp
+bind=0.0.0.0
+local_net=10.22.81.0/255.255.255.0
+external_media_address=33.44.55.100
+external_signaling_address=33.44.55.100
+```
+
+El significado de los parámetros añadidos en la sección `transport` del fichero **pjsip.conf** son los siguientes:
+
+- **localnet**: es un rango de direcciones IP que identifica a las extensiones de cada Asterisk. Si en una llamada la dirección de destino está dentro de este rango, no es necesario realizar ningún cambio en la dirección IP que coloca la extensión en el protocolo SDP.
+- **external_media_address**: es la direccion IP donde se espera recibir el flujo de audio RTP. Cuando en una llamada la dirección IP de destino no está dentro del rango definido por _localnet_, Asterisk debe modificar la dirección IP local incluida en el protocolo SDP y colocar el valor de `external_media_address` como nueva direccion IP.
+- **external_signaling_address**: es la direccion IP del lado WAN donde se espera recibir la señalización SIP. Cuando en una llamada la dirección IP de destino no está dentro del rango definido por _localnet_, Asterisk debe modificar el mensaje INVITE y colocar el valor de `external_signaling_address` como dirección de respuesta del mensaje.
+
+> [!NOTE]
+> Habitualmente los valores de `external_media_address` y `external_signaling_address` son las mismas, a menos que se utilicen servidores diferentes para la señalización SIP y el flujo de audio RTP.
+
+Ejemplo de sección `transport` en el fichero **pjsip.conf** del Asterisk-2:
+
+```asterisk
+; === definición del tipo de transporte ===
+[capa-transporte]
+type=transport
+protocol=udp
+bind=0.0.0.0
+local_net=10.22.81.0/255.255.255.0
+external_media_address=33.44.55.200
+external_signaling_address=33.44.55.200
+```
+
+Para el Asterisk-1 la dirección IP del enlace hacia donde se envían las llamadas salientes es la de la interfaz WAN del _router_ de Asterisk-2, y la dirección IP desde donde se admiten llamadas entrantes es también la misma dirección IP.
+
+Ejemplo del resto de código de las secciones en el fichero **pjsip.conf** del Asterisk-1:
+
+```asterisk
+; === definición enlace con Asterisk-2 ===
+[asterisk-2]
+type=endpoint
+transport=capa-transporte
+context=llamadas-entrantes
+disallow=all
+allow=alaw
+aors=asterisk-2
+direct_media=no
+
+[asterisk-2]
+type=identity
+endpoint=asterisk-2
+match=33.44.55.200
+
+[asterisk-2]
+type=aor
+contact=sip:33.44.55.200:5060
+max_contacts=1
+```
+
+La configuración en el fichero **pjsip.conf** del Asterisk-2 es similar, pero ahora la dirección IP del enlace donde se eviarán las llamadas salientes y la dirección IP desde donde se reciben llamadas entrantes, es la dirección IP de la interfaz WAN del otro _router_ de Asterisk.
+
+Ejemplo del resto de código de las secciones en el fichero **pjsip.conf** del Asterisk-2:
+
+```asterisk
+; === definición enlace con Asterisk-1 ===
+[asterisk-1]
+type=endpoint
+transport=capa-transporte
+context=llamadas-entrantes
+disallow=all
+allow=alaw
+aors=asterisk-1
+direct_media=no
+
+[asterisk-1]
+type=identity
+endpoint=asterisk-1
+match=33.44.55.100
+
+[asterisk-1]
+type=aor
+contact=sip:33.44.55.100:5060
+max_contacts=1
+```
+
+Una vez configurado los enlaces SIP es necesario configurar el _dialplan_ en cada uno de los ficheros **extensions.conf** de cada uno de los _routers_ de Asterisk para permitir las llamadas entre las extensiones.
+
+```asterisk
+; llamadas internas entre extensiones en Asterisk-1
+
+exten => _10[12],1,Dial(PJSIP/${EXTEN},20,tT)
+same  => n,Hangup()
+
+; llamadas salientes por el enlace con el Asterisk-2
+
+exten => _20[12],1,Dial(PJSIP/${EXTEN}@asterisk-2)
+same  => n,Hangup()
+
+[llamadas-entrantes]
+
+; llamadas entrantes por el enlace con Asterisk-2
+
+exten => _10[12],1,Dial(PJSIP/${EXTEN},20,tT)
+same  => n,Hangup()
+```
+
+Para el Asterisk-2 cambia únicamente que tanto las llamadas internas como las entrantes tienen como patrón de llamadas la expresión `_20[12]` y las llamadas salientes lo hacen por el enlace Asterisk-1 cuando se marcan los números 101 o 102.
+
+```asterisk
+; llamadas internas entre extensiones en Asterisk-2
+
+exten => _20[12],1,Dial(PJSIP/${EXTEN},20,tT)
+same  => n,Hangup()
+
+; llamadas salientes por el enlace con el Asterisk-1
+
+exten => _10[12],1,Dial(PJSIP/${EXTEN}@asterisk-1)
+same  => n,Hangup()
+
+[llamadas-entrantes]
+
+; llamadas entrantes por el enlace con Asterisk-1
+
+exten => _20[12],1,Dial(PJSIP/${EXTEN},20,tT)
+same  => n,Hangup()
+```
+
+Por último, es necesario configurar las dirección IP de las interfaces LAN y WAN en ambos _routers_ y efectuar las configuraciones de `port forwarding`, ya que sin esta última configuración los _router_ no dejan pasar hacia la parte LAN ningún paquete que no sea respuesta a una petición previa realizada anteriormente, siendo esto una característica del uso de NAT (Network Address Translation) por parte de estos equipos.
+
+> [!NOTE]
+> Los paquetes IP que llegan a la interfaz WAN del _router_ desde dirección IP a la cual no se han realizado peticiones previas, son rechazadas por el _router_ porque, simplemente, no puede saber a qué equipos de la zona LAN van dirigidos.
+
+La configuración de `port forwarding` permite que las peticiones de INVITE enviadas por un Asterisk lleguen hasta el otro Asterisk a través de su _router_.
+
+![alt text](imag/image-4.png "Configuración de port forwarding en el _router_ Asterisk-1")
+
+En la figura se muesrta la configuración de `port forwarding` en el _router_ de Asterisk-1. En la que se han creado dos reglas de reenvío de puertos: una para la señalización SIP, que utiliza el puerto 5060 UDP, y otra para el flujo de audio RTP, que utiliza el puerto 1000 a 2000 UDP.
+
+> [!TIP]
+> Las reglas de `port forwarding` para los paquetes de voz sobre los puertos 10000 a 20000 UDP realmente no es necesario.
+
+Si la configuración de `port forwarding` para la señalización SIP en ninguno de los _router_, también es posible iniciar una llamada si recientemente desde el otro extremo también se ha intentado iniciar una llamada.
+
+![alt text](imag/image-5.png "Estrategia para evitar el problema del NAT en el tráfico RTP")
+
+> [!CAUTION]
+> Se puede realizar un enlace o _trunk_ SIP entre dos PBX Asterisk a través de Internet, configurando adecuadamente el `port forwarding` en cada _router_ del operador, pero se debe tener en cuenta que algunos operadores de Internet no permiten el tráfico SIP por lo que, el enlace SIP no se puede realizar.
+
+## Enlace SIP con un Operador de VoIP
