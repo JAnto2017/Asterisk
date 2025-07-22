@@ -37,6 +37,7 @@
     - [Enlace SIP Entre Dos Centralitas Asterisk](#enlace-sip-entre-dos-centralitas-asterisk)
     - [Enlace SIP a Través de Router](#enlace-sip-a-través-de-router)
   - [Enlace SIP con un Operador de VoIP](#enlace-sip-con-un-operador-de-voip)
+  - [Configuración de una Operadora Automática](#configuración-de-una-operadora-automática)
 
 ---
 
@@ -1355,3 +1356,96 @@ Si la configuración de `port forwarding` para la señalización SIP en ninguno 
 > Se puede realizar un enlace o _trunk_ SIP entre dos PBX Asterisk a través de Internet, configurando adecuadamente el `port forwarding` en cada _router_ del operador, pero se debe tener en cuenta que algunos operadores de Internet no permiten el tráfico SIP por lo que, el enlace SIP no se puede realizar.
 
 ## Enlace SIP con un Operador de VoIP
+
+Las centralitas IP necesitan de un enlace o _trunk_ SIP con un operador de VoIP para poder realizar y recibir llamadas telefónicas desde la red de telefonía pública.
+
+La configuración del enlace SIP en el fichero PJSIP necesita dos nuevas secciones: una de tipo _registration_ para el registro a intervalos regulares con el operador de VoIP y otra de tipo _auth_ para la autenticación del operador de VoIP, mediante usuario y contraseña.
+
+Ejemplo de configuración de un enlace SIP con un operador de VoIP, donde los valores de usuario y clave son suministrados por el operador.
+
+```asterisk
+[enlace_operador_voip]
+type=registration
+transport=capa-transporte
+outbound_auth=enlace_operador_voip
+server_uri=sip:enlace_operador_voip
+client_uri=sip:25665@enlace_operador_voip
+expiration=60
+
+[enlace_operador_voip]
+type=auth
+auth_type=userpass
+username=25665
+password=clave25665
+
+[enlace_operador_voip]
+type=aor
+contact=sip:enlace_operador_voip:5060
+qualify_frequency=20
+
+[enlace_operador_voip]
+type=endpoint
+transport=capa-transporte
+context=llamadas-entrantes
+disallow=all
+allow=alaw
+outbound_auth=enlace_operador_voip
+aors=enlace_operador_voip
+from_user=25665
+from_domain=enlace_operador_voip
+direct_media=no
+
+[enlace_operador_voip]
+type=identity
+endpoint=enlace_operador_voip
+match=enlace_operador_voip
+```
+
+En la sección de tipo `registration` se define el intervalo de registro con el operador de VoIP. Se establecen las opciones para el registro con el operador, el cual se realiza a intervalos de 60 segundos. También se establece un enlace con la sección de tipo `auth` donde se encuentran el `username` y `password` del operador de VoIP.
+
+En los enlaces o _trunk_ SIP con un operador de VoIP los clientes deden registrarse en el operador a intervalos regulares, pero este no se registra contra los clientes.
+
+En la sección de tipo `aor` se establece la dirección de contacto para el enlace con el operador de VoIP, que en este ejemplo es `enlace_operador_voip`. En esta sección también está configurada la opción `qualify_frequency` con el valor de 20 segundos, que permite comprobar si el enlace está activo mediante el comando de consola `pjsip show aors`.
+
+En la sección de tipo `identify` se establece el punto de origen desde donde se admiten llamadas entrantes.
+
+En la sección de tipo `endpoint` se establece la autenticación para las llamadas salientes a través de la opción `outbound_auth`, la cual enlaza con la sección de tipo `auth` donde se encuentra el `username` y `password` del operador de VoIP. El campo `aors` enlaza con la sección de tipo `aor` donde se encuentra la direccion de contacto del operador de VoIP.
+
+Se envían registros de tipo REGISTER a intervalos regulares hacia el operador de VoIP a través del _router_, el cual deja pasar hacia la centralita Asterisk las respuestas enviadas por el operador. Esta característica de funcionamiento de los _router_ con las comunicaciones mediante el protocolo UDP crea lo que se conoce como un _agujero_ en el NAT durante un intervalo de tiempo que puede variar de un _router_ a otro y permite que, ante una llamada entrante desde la red pública de telefonía, el mensaje de INVITE enviado por el operador llegue a la centralita Asterisk.
+
+Si se cierra el _agujero_ del NAT antes de que se envíe una nueva petición de REGISTER no será posible recibir una nueva llamada entrante desde la red pública de telefonía, por lo menos hasta que se produzca un nuevo REGISTER o hasta que se efectúe una llamada saliente.
+
+> [!NOTE]
+> En la configuración de un enlace SIP con un operador de VoIP no es necesario emplear en el _router_ reglas de `port forwarding`, ni para la señalización ni para el tráfico de voz, siendo posible por tanto utilizar una misma conexión a Internet para diferentes enlaces SIP con el operador.
+
+Se puede utilzar el comando de consola `pjsip show registrations` para verificar si el enlace SIP ha quedado registrado con el operador o si, por el contrario, el registro ha sido rechazado.
+
+La configuración de la opción `qualify_frequency` en la sección de tipo `aor` de enlaces y extensiones hace que Asterisk envíe a intervalos regulares mensajes de tipo NOTIFY a dichos enlaces y extensiones, los cuales responden con un mensaje de tipo 200 OK, pudiéndose comprobar su estado mediante el comando de consola `pjsip show aors`.
+
+> [!TIP]
+> En la configuración del _dialplan_ se debe tener en cuenta que las llamadas entrantes a través de un enlace SIP con un operador de VoIP se envían, por defecto, a la extensión `start` o `s`.
+
+Ejemplo de _dialplan_ básico donde todas las llamadas entrantes por el enlace SIP con el operador se reciben en la extensión 101.
+
+```asterisk
+; Llamadas entrantes por enlace SIP con operador de VoIP
+
+[enlace_operador_voip]
+
+exten => s,1,Dial(PJSIP/101)
+same  => n,Hangup()
+
+; Llamadas salientes a fijos y móviles por el enlace SIP con operador de VoIP
+
+[extensiones-empresa]
+
+exten => _[6789]XXXXXX,1,Dial(PJSIP/${EXTEN}@enlace_operador_voip)
+same  => n,Hangup()
+
+; Llamadas internas
+
+exten => _10[12],1,Dial(PJSIP/${EXTEN})
+same  => n,Hangup()
+```
+
+## Configuración de una Operadora Automática
