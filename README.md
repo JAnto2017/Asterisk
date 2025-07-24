@@ -39,6 +39,7 @@
   - [Enlace SIP con un Operador de VoIP](#enlace-sip-con-un-operador-de-voip)
   - [Configuración de una Operadora Automática](#configuración-de-una-operadora-automática)
   - [Extensiones invalid y timeout](#extensiones-invalid-y-timeout)
+  - [Aplicación GotoIfTime()](#aplicación-gotoiftime)
 
 ---
 
@@ -1504,3 +1505,39 @@ same  => n,Hangup()
 
 ## Extensiones invalid y timeout
 
+Asterisk dispone de las extensiones `invalid` (`i`) y `timeout` (`t`) que se usan para indicar al usuario que la llamada ha sido rechazada o que se ha agotado el tiempo de espera. Utiliza la aplicación `WaitExten()`.
+
+Ejemplo de configuración de extensiones en el _dialplan_ usando las extensiones `i` y `t`:
+
+```asterisk
+[llamadas-entrantes]
+
+exten => s,1,Background(mensaje1)
+same  => n,WaitExten(7)
+same  => n,Hangup()
+
+exten => 1,1,Dial(PJSIP/102)
+same  => n,Hangup()
+
+exten => 2,1,Dial(PJSIP/103)
+same  => n,Hangup()
+
+exten => 3,1,Dial(PJSIP/104)
+same  => n,Hangup()
+
+exten => i,1,Playback(mensaje3)
+same  => n,Wait(3)
+same  => n,Goto(llamadas-entrantes,s,1)
+same  => n,Hangup()
+
+exten => t,1,Playback(mensaje2)
+same  => n,Wait(1)
+same  => n,Dial(PJSIP/101)
+same  => n,Hangup()
+```
+
+> [!NOTE]
+> Las opciones presentadas al usuario por la operadora automática pueden ser de un solo dígito o de varios dígitos.
+> Con la opción `m` en la aplicación `Background()` solo se aceptan marcaciones de un dígito.
+
+## Aplicación GotoIfTime()
