@@ -38,6 +38,7 @@
     - [Enlace SIP a Través de Router](#enlace-sip-a-través-de-router)
   - [Enlace SIP con un Operador de VoIP](#enlace-sip-con-un-operador-de-voip)
   - [Configuración de una Operadora Automática](#configuración-de-una-operadora-automática)
+  - [Extensiones invalid y timeout](#extensiones-invalid-y-timeout)
 
 ---
 
@@ -1449,3 +1450,57 @@ same  => n,Hangup()
 ```
 
 ## Configuración de una Operadora Automática
+
+- **Background()**: reproduce el mensaje de audio indicado como parámetro y detecta al mismo tiempo la posible marcación de dígitos por parte del usuario que llama. Cuando detecta un número que corresponde con un patrón de llamada, interrumpe la reproducción del mensaje de audio y envía el control de la llamada a la primera prioridad del contexto que contiene un patrón válido con el número marcado.
+- **WaitExten()**: espera durante el número de segundos indicado como parámetro a que se marque algún número en el teléfono y envía a continuación el control de la llamada a la primera prioridad del contexto que contiene un patrón válido con el número marcado. Se suele añadir detrás de la aplicación **Background()** y ofrece al usuario que llama un tiempo extra para realizar la marcación deseada después de escuchar el mensaje de audio reproducido por la aplicación **Background()**.
+- **Goto()**: permite realizar un salto a otro punto dentro del _dialplan_ especificado por el contexto, la extensión y la prioridad.
+- **Record()**: graba el audio de la llamada y lo almacena en el directorio indicado como parámetro.
+
+Después de que una operadora reproduzca el mensaje de bienvenida e instrucciones, deben estar previstas, entre otras, las siguientes posibilidades:
+
+- El usuario marca una de las opciones ofrecidas y la llamada es atendida.
+- El usuario marca una de las opciones ofrecidas, pero la llamada no es atendida por encontrarse la extensión de destino ocupada.
+- El usuario marca una de las opciones ofrecidas, pero nadie atiende la llamada en la extensión de destino.
+- El usuario marca un número no incluido entre las opciones ofrecidas.
+- El usuario no marca ningún número en un tiempo prefijado.
+
+Fragmento de código del fichero **extensions.conf** para una operadora automática de VoIP:
+
+```asterisk
+[llamadas-entrantes]
+
+exten => s,1,Background(mensaje1)
+same  => n,WaitExten(10)
+same  => n,Goto(llamadas-entrantes,1,1)
+same  => n,Hangup()
+
+exten => 1,1,Dial(PJSIP/102)
+same  => n,Hangup()
+
+exten => 2,1,Dial(PJSIP/103)
+same  => n,Hangup()
+
+exten => 3,1,Dial(PJSIP/104)
+same  => n,Hangup()
+
+exten => _[0-456789]!,1,Playback(mensaje3)
+same  => n,Wait(3)
+same  => n,Goto(llamadas-entrantes,s,1)
+same  => n,Hangup()
+
+[sin-marcacion]
+
+exten => 1,1,Playback(mensaje2)
+same  => n,Wait(1)
+same  => n,Dial(PJSIP/101)
+same  => n,Hangup()
+
+; mensaje1: está ud. hablando con ... si quiere hablar con ... marque 1 si quiere hablar con ... marque 2 si quiere hablar con ... marque 3 para cualquier otra consulta, espere.
+
+; mensaje2: transfiriendo su llamada a la extensión de operadora, espere.
+
+; mensaje3: ha marcado ud. un número erróneo. Por favor, inténtelo de nuevo. Gracias.
+```
+
+## Extensiones invalid y timeout
+
