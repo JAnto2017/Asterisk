@@ -40,6 +40,10 @@
   - [Configuración de una Operadora Automática](#configuración-de-una-operadora-automática)
   - [Extensiones invalid y timeout](#extensiones-invalid-y-timeout)
   - [Aplicación GotoIfTime()](#aplicación-gotoiftime)
+  - [FUNDAMENTOS DE SEGURIDAD EN TELEFONÍA IP](#fundamentos-de-seguridad-en-telefonía-ip)
+    - [Tipos de Ataques en Telefonia IP](#tipos-de-ataques-en-telefonia-ip)
+      - [Ataques de Denegación de Servicio](#ataques-de-denegación-de-servicio)
+    - [Ataques para Realizar Llamadas Fraudulentas](#ataques-para-realizar-llamadas-fraudulentas)
 
 ---
 
@@ -1541,3 +1545,108 @@ same  => n,Hangup()
 > Con la opción `m` en la aplicación `Background()` solo se aceptan marcaciones de un dígito.
 
 ## Aplicación GotoIfTime()
+
+La aplicación `GotoIfTime()` permite realizar un salto condicional en el _dialplan_ basado en el tiempo transcurrido desde el inicio de la llamada. Permite que las llamadas entrantes reciban un tratamiento diferente según la hora, el día de la semana, el mes o el año. La sintaxis de la aplicación es la siguiente:
+
+- `GotoIfTime(times, weekdays, mdays, months, [timezone]?[label-if-true:[label-if-false]])`
+- `times` es una lista de uno o más intervalos de horas en formato de 24 horas.
+- `weekdays` es una lista de días de la semana. Por ejemplo: `tue&thu`, donde los días se escriben: `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`. Para indicar el rango se separa con un guión. Para indicar días no correlativos, se escriben uno a continuación del otro separados por `&`.
+- `mdays` es una lista de uno o más intervalos de los días de un mes.
+- `months` es una lista de uno o más intervalos de meses de un año.
+- `Label-if-true` es la etiqueta donde se salta si la expresión se evalúa a _true_.
+- `Label-if-false` es la etiqueta donde se salta si la expresión se evalúa a _false_.
+
+Cuando un parámetro de la aplicación `GotoIfTime()` no va a ser tenido en cuenta, se sustituye por el símbolo `*`. Por ejemplo:
+
+- `GotoIfTime(*,*,*,aug?horario_vacaciones,s,1)`. Si la llamada se produce en agosto, la ejecución del _dialplan_ continúa con el contexto `horario_vacaciones` en la extensión `s` y con prioridad `1`. No se tiene en cuenta la hora, el día de la semana o el día del mes.
+- `GotoIfTime(*,sat-sun,*,*?dia_festivo,s,1)`. Si la llamada se produce en sábado o domingo, la ejecución del _dialplan_ continúa por el contexto `dia_festivo` en la extensión `s` y con prioridad `1`. No se tiene en cuenta la hora, el día o el mes.
+- `GotoIfTime(09:00-18:00,mon-fri,*,*?horario_dia,s,1:horario_noche,s,1)`. Si la llamada se produce entre las 9:00 y las 18:00 de lunes a viernes, la ejecución del _dialplan_ continúa por el contexto `horario_día` con la extensión `s` y prioridad `1`. Si se produce en otras horas, la ejecución del _dialplan_ continua por el contexto `horario_noche` con la extensión `s` y prioridad `1`.
+
+Ejemplo de configuración de un sistema de atención automática de llamadas que tiene en cuenta la hora del día y el día de la semana:
+
+```asterisk
+[llamadas-entrantes]
+
+exten => s,1,GotoIfTime(09:00-18:00,mon-fri,*,*?horario_dia,s,1:horario_noche,s,1)
+same  => n,Playback(mensaje1)
+same  => n,Hangup()
+
+[horario_laboral]
+
+exten => s,1,Background(mensaje2)
+same  => n,WaitExten(5)
+
+exten => 1,1,Dial(PJSIP/102)
+same  => n,Hangup()
+
+exten => 2,1,Dial(PJSIP/103)
+same  => n,Hangup()
+
+exten => 3,1,Dial(PJSIP/104)
+same  => n,Hangup()
+
+exten => i,1,Playback(mensaje3)
+same  => n,Wait(3)
+same  => n,Goto(horario_laboral,s,1)
+same  => n,Hangup()
+
+exten => t,1,Playback(mensaje2)
+same  => n,Wait(1)
+same  => n,Dial(PJSIP/101)
+same  => n,Hangup()
+
+; mensaje1: usted ha llamado a la extensión de operadora.
+; mensaje2: está hablando con ... si quiere hablar con ... marque 1, 2 o 3.
+; mensaje3: ha marcado ud. un número erróneo. Por favor, inténtelo de nuevo. Gracias.
+; mensaje4: transfiriendo su llamada a la extensión de operadora, espere.
+```
+
+> [!NOTE]
+> En OS Linux el comando `date` muestra la fecha y la hora de la zona horaria local.
+> CET es la abreviatura de Central European Time y es la hora estándar de Europa Central.
+
+- El comando `timedatectl list-timezones` muestra paises y zonas horarias disponibles.
+- `timedatectl list-timezones nombre_zona_horaria` cambia la zona horaria local por la indicada.
+- `timedatectl`: muestra información completa de la configuración horaria del sistema, incluyendo si está activado el servicio NTP.
+- `timedatectl set-time hh:mm:ss` permite ajustar la hora del sistema, si está desactivado NTP.
+- `timedatectl set-ntp on` activa el servicio NTP.
+- `timedatectl set-ntp off` desactiva el servicio NTP.
+- `timedatectl set-time yyyy-mm-dd` permite ajustar la fecha del sistema, si está desactivado NTP.
+
+> [!NOTE]
+> NTP (Network Time Protocolo) sincroniza la hora a través de Internet consultando servidores. Usa el puerto 123 UDP. En Linux _ntpd_ se ejecuta en segundo plano.
+
+---
+
+## FUNDAMENTOS DE SEGURIDAD EN TELEFONÍA IP
+
+Las centralitas deben estar protegidas contra ataques incluido la denegación de servicio.
+
+### Tipos de Ataques en Telefonia IP
+
+- Ataque por fuerza bruta.
+- Denegación de servicio. Intento de bloqueo de la centralita, realizando múltiples peticiones de registro de extensiones.
+
+#### Ataques de Denegación de Servicio
+
+El envío continuo de mensajes de tipo REGISTER (para registrar una extensión) o de tipo INVITE (para realizar una llamada de teléfono) a direcciones IP públicas que tienen el puerto 5060 UDP redireccionado a un servidor Asterisk.
+
+El proceso de autenticación para cada uno de los mensajes REGISTER o INVITE consume tiempo de CPU en Asterisk, con un número de peticiones muy elevado.
+
+> [!NOTE]
+> En un enlace SIP con un operador de VoIP no es necesario en ningún caso redireccionar el puerto 5060 UDP hacia el servidor de Asterisk.
+> Es necesario cuando existen extensiones en el exterior que debe registrar Asterisk, lo cual implica riesgo de seguridad, ya que cualquier petición de tipo REGISTER o INVITE enviada a la dirección IP pública y puerto 5060 UDP va a llegar hasta el servidor de Asterisk.
+
+Asterisk siempre verifica la identidad del usuario antes de aceptar peticiones de tipo REGISTER o INVITE. Ante una petición de tipo REGISTER, Asterisk siempre responde inicialmente con una respuesta de tipo 401 o UNAUTHORIZED, rechazando la petición de registro. Esto es así porque en el protocolo SIP una extensión nunca envía directamente en el mensaje de tipo REGISTER su contraseña, sino que se utiliza un protocolo de tipo _desafía-respuesta_, el cual requiere de esa primera respuesta de tipo 401 UNAUTHORIZED.
+
+Este protocolo de tipo _desafío-respuesta_ también se emplea cada vez que una extensión intenta hacer una llamada a través de Asterisk por medio de una petición de tipo INVITE.
+
+En el cálculo matemático realizado en el desafío interviene también un número binario aleatorio de 128 bits enviado por Asterisk, que se denomina _nonce_ y que cambia con cada petición de auttenticación, ya sea de tipo REGISTER o INVITE.
+
+El cálculo matemático se realiza mediante el algoritmo de _hash_ MD5. Este algoritmo de tipo resumen o _digest_ cumplen la primera condición, pero la segunda condición no es posible cumplirla con un _hash_ de tamaño finito, que en el caso de MD5 es de 128 bits. Por lo tanto, si el número de entradas al algoritmo es mayor que $2^{128}$, entonces el algoritmo no puede cumplir con la segunda condición.
+
+> [!NOTE]
+> MD5 no es seguro, pero sigue siendo usado en el protocolo SIP.
+> SHA256 o SHA512/256 son más seguros.
+
+### Ataques para Realizar Llamadas Fraudulentas
