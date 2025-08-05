@@ -44,6 +44,7 @@
     - [Tipos de Ataques en Telefonia IP](#tipos-de-ataques-en-telefonia-ip)
       - [Ataques de Denegación de Servicio](#ataques-de-denegación-de-servicio)
     - [Ataques para Realizar Llamadas Fraudulentas](#ataques-para-realizar-llamadas-fraudulentas)
+    - [Protección de Asterisk mediante un Firewall](#protección-de-asterisk-mediante-un-firewall)
 
 ---
 
@@ -1650,3 +1651,41 @@ El cálculo matemático se realiza mediante el algoritmo de _hash_ MD5. Este alg
 > SHA256 o SHA512/256 son más seguros.
 
 ### Ataques para Realizar Llamadas Fraudulentas
+
+Las llamadas fraudulentas se pueden producir:
+
+- Mediante el registro fraudulento de una extensión, la cual una vez registrada, puede realizar llamadas salientes hacia la red de telefonía pública a través del enlace SIP con el operador de VoIP. Se evita, utilizando contraseñas seguras en el fichero **pjsip.conf**. El _dialplan_ debe ser restrictivo y no permitir todo tipo de llamadas desde cualquier extensión del sistema, en especial a números de tarificación.
+- Mediante el envío de una petición de INVITE a través del contexto _anonymous_, que es un contexto que tiene Asterisk para permitir llamadas anónimas desde extensiones que no están registradas en el sistemas. El contesto _anonymous_ está desactivado por defecto en **pjsip.conf** y se puede activar creando un _endpoint_ con ese nombre y un contexto donde se tratan las llamadas entrantes a través de ese _endpoint_ dentro del _dialplan_.
+
+En la definición del _endpoint anonymous_ en el fichero **pjsip.conf** no es necesaria la sección de tipo `auth`, ya que no se va a producir ningún tipo de registro contra dicho _endpoint_.
+
+```asterisk
+; Definición del endpoint de tipo anonymous
+[anonymous]
+type=endpoint
+context=anonymous
+disallow=all
+allow=alaw
+aors=anonymous
+transport=capa-transporte
+
+[anonymous]
+type=aor
+max_contacts=1
+remove_existing=yes
+context=anonymous
+
+; Ejemplo de contexto anonymous en el dialplan para llamadas anónimas
+[anonymous]
+exten => _20[1234]XXXX,1,Dial(PJSIP/${EXTEN}@enlace_anonimo)
+same  => n,Hangup()
+```
+
+> [!NOTE]
+> Una llamada por el contexto _anonymous_ se puede hacer desde una extensión que apunte a la dirección IP del servidor de Asterisk y que tenga un número de extensión no incluido en el fichero **pjsip.conf**. La extensión no se registra, pero al hacer una llamada, envía una petición de tipo INVITE al servidor de Asterisk que entra en el context _anonymous_.
+
+Las peticiones de tipo INVITE enviadas por extensiones que están registradas en Asterisk son enviadas al contexto correspondiente a dichas extensiones, pero las enviadas por extensiones no registradas son enviadas al contexto _anonymous_.
+
+Esta circunstancia la intentan aprovechar muchos ataques, enviando continuamente peticiones de INVITE a números diversos para conseguir llamadas fraudulentas.
+
+### Protección de Asterisk mediante un Firewall
