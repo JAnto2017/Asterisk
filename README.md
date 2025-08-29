@@ -45,6 +45,7 @@
       - [Ataques de Denegación de Servicio](#ataques-de-denegación-de-servicio)
     - [Ataques para Realizar Llamadas Fraudulentas](#ataques-para-realizar-llamadas-fraudulentas)
     - [Protección de Asterisk mediante un Firewall](#protección-de-asterisk-mediante-un-firewall)
+    - [Aplicación de Seguridad FAIL2BAN](#aplicación-de-seguridad-fail2ban)
 
 ---
 
@@ -1693,4 +1694,49 @@ Esta circunstancia la intentan aprovechar muchos ataques, enviando continuamente
 Medidas de seguridad desde un _firewall_:
 
 1. Bloquear las direcciones IP públicas desde las que se reciben ataques.
-2. Limitar el rango
+2. Limitar el rango de direcciones IP privadas, desde las que se permiten peticiones de tipo REGISTER o INVITE, permitiendo únicamente peticiones desde extensiones situadas en un determinado rango de direcciones IP.
+3. Prohibir la entrada de paquetes IP desde los lugares maliciosos.
+4. Permitir las conexiones SSH al servidor de Asterisk, solo desde determinadas direcciones IP.
+
+> [!NOTE]
+> La configuración de _netfilter_ consta de una serie de reglas que se crean mediante una aplicación denominada _nftables_.
+> Una alternativa es _ufw_ que permite una configuración más sencilla del firewall.
+
+La aplicación _ufw_ está instalado por defecto, para conocer su estado se dispone del comando: `asterisk# ufw status`.
+
+Mediante el comando `ufw help` se muestra el listado de comandos.
+
+Al activar _ufw_ queda prohibida la entrada de cualquier paquete IP que no sea una respuesta a una petición realizada previamente, por lo que queda prohibida también cualquier nueva conexión por SSH. Las conexiones SSH activas en ese momento pueden ser interrumpidas por _ufw_.
+
+El comando `ufw status verbose` muestra el estado del firewall con detalle. Por defecto están permitidas todas las conexiones salientes `allow` _(outgoing)_ y están prohibidas todas las conexiones entrantes que no formen parte de la respuesta a una petición previa `deny` _(incoming)_
+
+Para permitir la conexión por SSH con el servidor Asterisk, mediante el comando `ufw allow 22`.
+
+Cada regla recibe un número de orden que puede ser consultado mediante el comando `ufw status numbered`.
+
+Para restringir las direcciones IP desde las que se permiten conexiones por SSH se realiza mediante el comando `ufw allow from dir-IP to any port puerto proto protocolo`.
+
+> [!TIP]
+> UFW evalúa las reglas en orden.
+> Si hay una regla más general situada por delante de una regla más específica, esta última no tendrá efecto alguno.
+
+Mediante el comando `ufw delete número de la regla` se puede modificar y borrar las reglas.
+
+En la configuración del firewall es necesario crear las reglas necesarias para permitir los mensajes SIP (puerto 5060 UDP) ya que con la configuración por defecto de _ufw_ todas las peticiones de tipo REGISTER o INVITE son bloqueadas. De la misma forma, es necesario añadir una regla para permitir el tráfico de voz RTP entre Asterisk y las extensiones, que por defecto se lleva a cabo en el rango de puertos del 10000 a 20000 UDP.
+
+> [!NOTE]
+> La configuración del rango de puertos UDP para el tráfico de voz en Asterisk se lleva a cabo en el fichero _rtp.conf_.
+
+Una medida de seguridad, es colocar las extensiones telefónicas en un mismo rango de direcciones IP y permitir en _ufw_ únicamente dicho rango para el tráfico SIP hacia Asterisk. El comando es `ufw allow from dirección de red/máscada de subred to any port número de puerto proto protocolo`.
+
+> [!NOTE]
+> No es necesario insertar una regla en _ufw_ para permitir la entrada de mensajes SIP a través del enlace SIP con el operador de VoIP.
+> _ufw_ permite insertar reglas para prohibir la entrada de peticiones SIP desde aquellas direcciones IP que son origen de ataques a la centralita Asterisk.
+
+Ejemplo de bloquear todo el tráfico SIP con origen en la dirección IP es: `ufw deny from 194.244.228.215 to any port 5060 proto udp`.
+
+Para insertar una regla en una posición determinada: `ufw insert 2 deny from 194.244.228.215 to any port 5060 proto udp`.
+
+![alt text](imag/protfirewall.png)
+
+### Aplicación de Seguridad FAIL2BAN
