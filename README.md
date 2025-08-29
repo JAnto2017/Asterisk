@@ -1689,3 +1689,8 @@ Las peticiones de tipo INVITE enviadas por extensiones que están registradas en
 Esta circunstancia la intentan aprovechar muchos ataques, enviando continuamente peticiones de INVITE a números diversos para conseguir llamadas fraudulentas.
 
 ### Protección de Asterisk mediante un Firewall
+
+Medidas de seguridad desde un _firewall_:
+
+1. Bloquear las direcciones IP públicas desde las que se reciben ataques.
+2. Limitar el rango
